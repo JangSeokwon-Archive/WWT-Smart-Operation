@@ -1,0 +1,1538 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@200;300;400;500;600;700;800;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200');
+
+:root {
+    --glass: rgba(20, 20, 35, 0.40);
+    --border: rgba(139, 92, 246, 0.22);
+    --borderStrong: rgba(139, 92, 246, 0.32);
+    --borderHover: rgba(139, 92, 246, 0.45);
+}
+
+* {
+    font-family: 'Inter', -apple-system, sans-serif !important;
+}
+
+/* Keep Streamlit/Material icon ligatures working */
+[class^="material-symbols"],
+[class*=" material-symbols"],
+button[title*="sidebar" i] span {
+    font-family: 'Material Symbols Rounded', 'Material Symbols Outlined' !important;
+    font-weight: normal !important;
+    font-style: normal !important;
+    line-height: 1 !important;
+    letter-spacing: normal !important;
+    text-transform: none !important;
+    white-space: nowrap !important;
+    direction: ltr !important;
+    font-feature-settings: "liga" 1 !important;
+    -webkit-font-feature-settings: "liga" 1 !important;
+}
+
+body,
+.stApp {
+    background: radial-gradient(circle at 50% 0%, #1a1033 0%, hsl(240, 33%, 3%) 60%, #000 100%);
+    color: #fff;
+}
+
+footer,
+#MainMenu,
+.stDeployButton {
+    display: none !important;
+}
+
+header[data-testid="stHeader"],
+.stApp>header {
+    background: transparent !important;
+}
+
+/* Sidebar toggle: use native Streamlit control (no custom overlay/icon replacement) */
+[data-testid="stSidebarCollapsedControl"],
+[data-testid="stSidebarCollapseButton"],
+ [data-testid="collapsedControl"],
+ [data-testid="collapsedControl"] button,
+button[title*="sidebar" i],
+button[aria-label*="sidebar" i],
+button[title*="open" i][title*="nav" i],
+button[title*="close" i][title*="nav" i],
+button[aria-label*="open" i][aria-label*="nav" i],
+button[aria-label*="close" i][aria-label*="nav" i] {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 32px !important;
+    height: 32px !important;
+    min-width: 32px !important;
+    min-height: 32px !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    position: relative !important;
+    font-size: 0 !important;
+    color: transparent !important;
+    line-height: 0 !important;
+    text-indent: -9999px !important;
+    overflow: hidden !important;
+}
+
+[data-testid="stSidebarCollapsedControl"] *,
+[data-testid="stSidebarCollapseButton"] *,
+ [data-testid="collapsedControl"] *,
+button[title*="sidebar" i] *,
+button[aria-label*="sidebar" i] *,
+button[title*="open" i][title*="nav" i] *,
+button[title*="close" i][title*="nav" i] *,
+button[aria-label*="open" i][aria-label*="nav" i] *,
+button[aria-label*="close" i][aria-label*="nav" i] * {
+    font-size: 0 !important;
+    color: transparent !important;
+}
+
+[data-testid="stSidebarCollapsedControl"]::after,
+[data-testid="stSidebarCollapseButton"]::after,
+ [data-testid="collapsedControl"]::after,
+ [data-testid="collapsedControl"] button::after,
+button[title*="sidebar" i]::after,
+button[aria-label*="sidebar" i]::after,
+button[title*="open" i][title*="nav" i]::after,
+button[title*="close" i][title*="nav" i]::after,
+button[aria-label*="open" i][aria-label*="nav" i]::after,
+button[aria-label*="close" i][aria-label*="nav" i]::after {
+    content: "☰";
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #FFFFFF;
+    font-size: 1.05rem;
+    line-height: 1;
+    text-indent: 0;
+    pointer-events: none;
+}
+
+/* Streamlit header toolbar fallback: ensure first nav-toggle button is iconized */
+header [data-testid="stToolbar"] button:first-child {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 32px !important;
+    height: 32px !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    font-size: 0 !important;
+    color: transparent !important;
+    line-height: 0 !important;
+    text-indent: -9999px !important;
+    overflow: hidden !important;
+    position: relative !important;
+}
+
+header [data-testid="stToolbar"] button:first-child * {
+    font-size: 0 !important;
+    color: transparent !important;
+}
+
+header [data-testid="stToolbar"] button:first-child::after {
+    content: "☰";
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #FFFFFF;
+    font-size: 1.05rem;
+    line-height: 1;
+    text-indent: 0;
+    pointer-events: none;
+}
+
+/* =========================
+   Global layout (✅ sidebar 자동 변동 유지)
+   - fixed sidebar 같은거 절대 안 씀
+   ========================= */
+.block-container {
+    max-width: 1400px !important;
+    margin: 0 auto !important;
+    padding-left: 1.25rem !important;
+    padding-right: 1.25rem !important;
+}
+
+.app-super-title {
+    font-size: 1.1rem;
+    font-weight: 800;
+    letter-spacing: .06em;
+    color: #EDE9FE;
+    margin: 0.15rem 0 0.9rem;
+}
+
+.sidebar-main-title {
+    font-size: 1rem;
+    font-weight: 800;
+    letter-spacing: .05em;
+    color: #FFFFFF;
+    margin-top: 0.15rem;
+    margin-bottom: 0.25rem;
+}
+
+/* Sidebar title above page buttons (stable in multipage nav) */
+[data-testid="stSidebarNav"] {
+    position: relative !important;
+    padding-top: 3.1rem !important;
+}
+
+[data-testid="stSidebarNav"]::before {
+    content: "대산 WWT 방류수 예측";
+    position: absolute;
+    top: 0.35rem;
+    left: 0.8rem;
+    right: 0.8rem;
+    color: #FFFFFF;
+    font-size: 1.02rem;
+    font-weight: 900;
+    letter-spacing: 0.02em;
+    line-height: 1.2;
+    z-index: 2;
+    pointer-events: none;
+}
+
+[data-testid="stSidebarNav"] ul {
+    margin-top: 0 !important;
+}
+
+/* Codex-like sidebar (clean, neutral, no accent gradients) */
+[data-testid="stSidebar"] {
+    background: #0b0f14 !important;
+    border-right: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+
+[data-testid="stSidebar"] > div:first-child {
+    background: #0b0f14 !important;
+}
+
+[data-testid="stSidebarNav"] {
+    background: transparent !important;
+}
+
+[data-testid="stSidebarNav"] [data-testid="stSidebarNavItems"] a {
+    color: #F9FAFB !important;
+    border-radius: 10px !important;
+    border: 1px solid rgba(255, 255, 255, 0.06) !important;
+    padding: 0.45rem 0.6rem !important;
+    margin: 0.1rem 0.25rem !important;
+    background: transparent !important;
+    outline: none !important;
+    box-shadow: none !important;
+    -webkit-tap-highlight-color: transparent !important;
+    transition: none !important;
+}
+
+[data-testid="stSidebarNav"] [data-testid="stSidebarNavItems"] a:hover,
+[data-testid="stSidebarNav"] [data-testid="stSidebarNavItems"] a:focus,
+[data-testid="stSidebarNav"] [data-testid="stSidebarNavItems"] a:active,
+[data-testid="stSidebarNav"] [data-testid="stSidebarNavItems"] a:visited {
+    background: transparent !important;
+    border-color: rgba(255, 255, 255, 0.18) !important;
+    color: #FFFFFF !important;
+    outline: none !important;
+    box-shadow: none !important;
+}
+
+[data-testid="stSidebarNav"] [aria-current="page"] {
+    background: transparent !important;
+    border-color: rgba(255, 255, 255, 0.36) !important;
+    color: #FFFFFF !important;
+    font-weight: 700 !important;
+    outline: none !important;
+    box-shadow: none !important;
+}
+
+[data-testid="stSidebarNav"] [data-testid="stSidebarNavItems"] li,
+[data-testid="stSidebarNav"] [data-testid="stSidebarNavItems"] div {
+    background: transparent !important;
+}
+
+/* Rename first page label in sidebar nav to Main */
+[data-testid="stSidebarNav"] [data-testid="stSidebarNavItems"] li:first-child a p,
+[data-testid="stSidebarNav"] [data-testid="stSidebarNavItems"] li:first-child a span {
+    visibility: hidden !important;
+    position: relative !important;
+}
+
+[data-testid="stSidebarNav"] [data-testid="stSidebarNavItems"] li:first-child a p::after,
+[data-testid="stSidebarNav"] [data-testid="stSidebarNavItems"] li:first-child a span::after {
+    content: "Main";
+    visibility: visible !important;
+    position: absolute;
+    left: 0;
+    top: 0;
+    color: #FFFFFF;
+    font-weight: 700;
+}
+
+[data-testid="stSidebarNav"] hr {
+    border-color: rgba(255, 255, 255, 0.10) !important;
+}
+
+/* Prevent brief flicker on sidebar page transitions */
+[data-testid="stSidebarNav"] * {
+    transition: none !important;
+    animation: none !important;
+}
+
+[data-testid="stSidebar"] {
+    contain: layout paint style;
+}
+
+#diag_btn_anchor {
+    display: none;
+}
+
+div[data-testid="stVerticalBlock"]:has(#diag_btn_anchor) [data-testid="stButton"] > button {
+    height: 30px !important;
+    padding: 0 12px !important;
+    border-radius: 999px !important;
+    border: 1px solid rgba(124, 58, 237, 0.45) !important;
+    background: linear-gradient(135deg, rgba(20, 16, 42, 0.95), rgba(29, 22, 58, 0.92)) !important;
+    color: #EDE9FE !important;
+    font-size: .78rem !important;
+    font-weight: 700 !important;
+    box-shadow: 0 6px 16px rgba(124, 58, 237, 0.20) !important;
+}
+
+div[data-testid="stVerticalBlock"]:has(#diag_btn_anchor) [data-testid="stButton"] > button:hover {
+    border-color: rgba(167, 139, 250, 0.80) !important;
+    box-shadow: 0 8px 22px rgba(124, 58, 237, 0.28) !important;
+}
+
+/* Segmented date tabs: make selected period clearly highlighted */
+[data-testid="stSegmentedControl"] [role="radiogroup"] {
+    background: rgba(10, 10, 20, 0.45) !important;
+    border: 1px solid rgba(139, 92, 246, 0.28) !important;
+    border-radius: 999px !important;
+    padding: 4px !important;
+}
+
+[data-testid="stSegmentedControl"] [role="radio"] {
+    border-radius: 999px !important;
+    color: rgba(237, 233, 254, 0.72) !important;
+    font-weight: 700 !important;
+    transition: all .18s ease !important;
+}
+
+[data-testid="stSegmentedControl"] [role="radio"][aria-checked="true"] {
+    background: linear-gradient(135deg, rgba(124, 58, 237, 0.88), rgba(167, 139, 250, 0.78)) !important;
+    color: #fff !important;
+    box-shadow: 0 6px 16px rgba(124, 58, 237, 0.34) !important;
+}
+
+#sim_target_input_anchor {
+    display: none;
+}
+
+div[data-testid="stVerticalBlock"]:has(#sim_target_input_anchor) [data-testid="stNumberInput"] {
+    background: rgba(20, 14, 32, 0.75) !important;
+    border: 1px solid rgba(139, 92, 246, 0.30) !important;
+    border-radius: 14px !important;
+    padding: 0.35rem 0.55rem !important;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.28) !important;
+}
+
+div[data-testid="stVerticalBlock"]:has(#sim_target_input_anchor) [data-testid="stNumberInput"] input {
+    background: rgba(9, 8, 18, 0.92) !important;
+    border: 1px solid rgba(139, 92, 246, 0.35) !important;
+    border-radius: 10px !important;
+    color: #fff !important;
+    font-weight: 700 !important;
+}
+
+div[data-testid="stVerticalBlock"]:has(#sim_target_input_anchor) [data-testid="stNumberInput"] button {
+    background: rgba(18, 16, 30, 0.95) !important;
+    color: #EDE9FE !important;
+    border-color: rgba(139, 92, 246, 0.35) !important;
+}
+
+/* =========================
+   KPI Glass Card + hover glow
+   ========================= */
+.glass-card {
+    position: relative;
+    background: var(--glass);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.50);
+    transition: border-color .2s ease, box-shadow .2s ease, transform .2s ease;
+    overflow: hidden;
+}
+
+.chart-card {
+    padding: 1.25rem !important;
+    background: rgba(20, 14, 32, 0.75) !important;
+    border: 1px solid rgba(139, 92, 246, 0.25) !important;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.55) !important;
+    overflow: hidden !important;
+}
+
+.chart-card > div {
+    background: transparent !important;
+}
+
+.chart-card .trend-title {
+    margin-bottom: 0.35rem !important;
+}
+
+@keyframes forecastBlink {
+    0% {
+        opacity: 1.0;
+        filter: drop-shadow(0 0 0 rgba(34, 211, 238, 0.0));
+    }
+    50% {
+        opacity: 0.25;
+        filter: drop-shadow(0 0 8px rgba(34, 211, 238, 0.55));
+    }
+    100% {
+        opacity: 1.0;
+        filter: drop-shadow(0 0 0 rgba(34, 211, 238, 0.0));
+    }
+}
+
+/* Main trend: first trace is actual, forecast starts from 2nd trace */
+div[data-testid="stVerticalBlock"]:has(#trend_card_anchor) .js-plotly-plot .scatterlayer .trace:nth-child(n+2) .lines path,
+div[data-testid="stVerticalBlock"]:has(#trend_card_anchor) .js-plotly-plot .scatterlayer .trace:nth-child(n+2) .points path {
+    animation: forecastBlink 1.15s ease-in-out infinite !important;
+}
+
+/* Simulator trend animation disabled (restore stable previous behavior) */
+
+/* Right slide-in diagnosis drawer */
+.diag-drawer {
+    position: fixed;
+    top: 0;
+    right: 0;
+    width: 420px;
+    height: 100dvh;
+    z-index: 1200;
+    padding: 1.1rem 1rem 1rem;
+    background: linear-gradient(180deg, rgba(13, 11, 24, 0.97), rgba(6, 6, 12, 0.97));
+    border-left: 1px solid rgba(139, 92, 246, 0.35);
+    box-shadow: -14px 0 34px rgba(0, 0, 0, 0.45);
+    transform: translateX(102%);
+    transition: transform .28s ease;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+    touch-action: pan-y;
+    padding-bottom: 6.2rem;
+    pointer-events: auto;
+}
+
+.diag-drawer.open {
+    transform: translateX(0);
+}
+
+.diag-drawer-head {
+    font-size: .95rem;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: #A78BFA;
+    font-weight: 800;
+    margin-bottom: .25rem;
+}
+
+.diag-drawer-source {
+    color: #8E8EA4;
+    font-size: .75rem;
+    margin-bottom: .5rem;
+}
+
+.diag-drawer-status {
+    font-size: 1.25rem;
+    font-weight: 900;
+    margin-bottom: .55rem;
+}
+
+.diag-drawer-body {
+    color: #ECECF7;
+    font-size: .92rem;
+    line-height: 1.45;
+    margin-bottom: .9rem;
+    background: rgba(18, 16, 28, 0.78);
+    border: 1px solid rgba(139, 92, 246, 0.20);
+    border-radius: 10px;
+    padding: .55rem .6rem;
+}
+
+.diag-report-list {
+    margin: 0;
+    padding-left: 1.05rem;
+}
+
+.diag-report-list li {
+    margin-bottom: .4rem;
+    color: #ECECF7;
+    line-height: 1.45;
+    font-size: .90rem;
+}
+
+.diag-drawer-sec {
+    color: #A78BFA;
+    font-size: .75rem;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    font-weight: 700;
+    margin: .7rem 0 .35rem;
+}
+
+.diag-drawer-list {
+    margin: 0;
+    padding-left: 1.1rem;
+    color: #D7D7E4;
+    background: rgba(18, 16, 28, 0.72);
+    border: 1px solid rgba(139, 92, 246, 0.16);
+    border-radius: 10px;
+    padding: .5rem .75rem .5rem 1.45rem;
+}
+
+.diag-drawer-list li {
+    margin-bottom: .45rem;
+    font-size: .86rem;
+    line-height: 1.35;
+}
+
+.diag-action-wrap {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: .5rem;
+    margin-bottom: .35rem;
+}
+
+.diag-action-card {
+    border: 1px solid rgba(139, 92, 246, 0.24);
+    background: rgba(22, 18, 34, 0.82);
+    border-radius: 10px;
+    padding: .5rem .55rem;
+}
+
+.diag-action-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: .5rem;
+    margin-bottom: .2rem;
+}
+
+.diag-action-head b {
+    color: #F3F4F6;
+    font-size: .84rem;
+    font-weight: 800;
+}
+
+.diag-action-head span {
+    color: #C4B5FD;
+    font-size: .72rem;
+    font-weight: 700;
+}
+
+.diag-action-reason {
+    color: #C7C7D8;
+    font-size: .79rem;
+    line-height: 1.35;
+}
+
+.diag-kpi-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: .45rem;
+    margin: .35rem 0 .8rem;
+}
+
+.diag-kpi-card {
+    border: 1px solid rgba(139, 92, 246, 0.28);
+    border-radius: 10px;
+    background: rgba(14, 12, 24, 0.85);
+    padding: .45rem .55rem;
+}
+
+.diag-kpi-card span {
+    display: block;
+    color: #9CA3AF;
+    font-size: .70rem;
+    margin-bottom: .1rem;
+}
+
+.diag-kpi-card b {
+    color: #F3F4F6;
+    font-size: .82rem;
+    font-weight: 700;
+}
+
+.diag-loading-wrap {
+    min-height: 180px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: .75rem;
+}
+
+.diag-loading-spinner {
+    width: 34px;
+    height: 34px;
+    border-radius: 999px;
+    border: 3px solid rgba(167, 139, 250, 0.25);
+    border-top-color: #A78BFA;
+    animation: diagSpin .9s linear infinite;
+}
+
+.diag-loading-text {
+    color: #EDE9FE;
+    font-size: .88rem;
+    font-weight: 700;
+    letter-spacing: .03em;
+}
+
+@keyframes diagSpin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+#diag_close_btn_anchor {
+    display: none;
+}
+
+div[data-testid="stVerticalBlock"]:has(#diag_close_btn_anchor) [data-testid="stButton"] > button {
+    position: fixed !important;
+    right: 16px !important;
+    bottom: 18px !important;
+    z-index: 1305 !important;
+    width: 388px !important;
+    height: 40px !important;
+    border-radius: 10px !important;
+    border: 1px solid rgba(139, 92, 246, 0.45) !important;
+    background: rgba(20, 16, 32, 0.96) !important;
+    color: #EDE9FE !important;
+    font-weight: 700 !important;
+}
+
+div[data-testid="stVerticalBlock"]:has(#diag_close_btn_anchor) [data-testid="stButton"] > button:hover {
+    border-color: rgba(167, 139, 250, 0.8) !important;
+}
+
+.glass-card::before {
+    content: "";
+    position: absolute;
+    inset: -1px;
+    background:
+        radial-gradient(circle at 30% 20%, rgba(139, 92, 246, 0.20), transparent 55%),
+        radial-gradient(circle at 80% 0%, rgba(139, 92, 246, 0.12), transparent 55%);
+    opacity: 0;
+    transition: opacity .2s ease;
+    pointer-events: none;
+}
+
+.glass-card:hover {
+    border-color: var(--borderHover);
+    box-shadow: 0 10px 45px rgba(139, 92, 246, 0.18), 0 6px 30px rgba(0, 0, 0, 0.55);
+    transform: translateY(-1px);
+}
+
+.glass-card:hover::before {
+    opacity: 1;
+}
+
+/* Typography */
+.metric-label {
+    font-size: .70rem;
+    font-weight: 600;
+    color: #A78BFA;
+    text-transform: uppercase;
+    letter-spacing: .10em;
+    margin-bottom: .5rem;
+}
+
+.metric-value {
+    font-size: 3.5rem;
+    font-weight: 700;
+    font-family: 'JetBrains Mono', monospace !important;
+    background: linear-gradient(180deg, #FFF 0%, #A78BFA 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    letter-spacing: -.05em;
+    line-height: 1;
+}
+
+.metric-value-md {
+    font-size: 2rem;
+    font-weight: 600;
+    font-family: 'JetBrains Mono', monospace !important;
+    color: #FFF;
+}
+
+.metric-sub {
+    font-size: .80rem;
+    color: #aaa;
+}
+
+/* Status badges: green/yellow/red with pulse on OK */
+.status-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.42rem 0.78rem;
+    border-radius: 999px;
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    border: 1px solid transparent;
+    background: rgba(17, 24, 39, 0.45);
+}
+
+.status-dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    position: relative;
+    flex: 0 0 9px;
+}
+
+.status-ok {
+    color: #22c55e;
+    border-color: rgba(34, 197, 94, 0.45);
+    background: rgba(34, 197, 94, 0.12);
+}
+
+.status-ok .status-dot {
+    background: #22c55e;
+    box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.65);
+}
+
+.status-ok .status-dot::after {
+    content: "";
+    position: absolute;
+    inset: -4px;
+    border-radius: 50%;
+    border: 1px solid rgba(34, 197, 94, 0.55);
+    animation: statusPulse 1.6s ease-out infinite;
+}
+
+.status-warn {
+    color: #f59e0b;
+    border-color: rgba(245, 158, 11, 0.45);
+    background: rgba(245, 158, 11, 0.12);
+}
+
+.status-warn .status-dot {
+    background: #f59e0b;
+}
+
+.status-alarm {
+    color: #ef4444;
+    border-color: rgba(239, 68, 68, 0.45);
+    background: rgba(239, 68, 68, 0.12);
+}
+
+.status-alarm .status-dot {
+    background: #ef4444;
+}
+
+.status-unknown {
+    color: #9ca3af;
+    border-color: rgba(156, 163, 175, 0.35);
+    background: rgba(156, 163, 175, 0.10);
+}
+
+.status-unknown .status-dot {
+    background: #9ca3af;
+}
+
+@keyframes statusPulse {
+    0% {
+        transform: scale(0.8);
+        opacity: 0.95;
+    }
+    70% {
+        transform: scale(1.9);
+        opacity: 0;
+    }
+    100% {
+        transform: scale(1.9);
+        opacity: 0;
+    }
+}
+
+/* =========================
+   Trend card custom (anchor target)
+   ========================= */
+#trend_card_anchor {
+    display: none;
+}
+
+div[data-testid="stContainer"]:has(#trend_card_anchor) {
+    position: relative;
+    background: var(--glass);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border: 1px solid var(--borderStrong);
+    border-radius: 16px;
+    box-shadow: 0 4px 30px rgba(0, 0, 0, .50);
+    padding: 1.25rem;
+    overflow: hidden;
+    transition: border-color .2s ease, box-shadow .2s ease, transform .2s ease;
+}
+
+div[data-testid="stContainer"]:has(#trend_card_anchor)::before {
+    content: "";
+    position: absolute;
+    inset: -1px;
+    background:
+        radial-gradient(circle at 35% 25%, rgba(139, 92, 246, 0.18), transparent 55%),
+        radial-gradient(circle at 85% 5%, rgba(139, 92, 246, 0.10), transparent 55%);
+    opacity: 0;
+    transition: opacity .2s ease;
+    pointer-events: none;
+}
+
+div[data-testid="stContainer"]:has(#trend_card_anchor):hover {
+    border-color: var(--borderHover);
+    box-shadow: 0 10px 45px rgba(139, 92, 246, 0.16), 0 6px 30px rgba(0, 0, 0, .55);
+    transform: translateY(-1px);
+}
+
+div[data-testid="stContainer"]:has(#trend_card_anchor):hover::before {
+    opacity: 1;
+}
+
+.trend-title {
+    font-size: .85rem;
+    font-weight: 700;
+    letter-spacing: .14em;
+    color: #A78BFA;
+}
+
+/* Range control right align (main/simulator) */
+#trend_range_anchor,
+#sim_range_anchor {
+    display: none;
+}
+
+div[data-testid="stVerticalBlock"]:has(#trend_range_anchor) [data-testid="stSegmentedControl"],
+div[data-testid="stVerticalBlock"]:has(#sim_range_anchor) [data-testid="stSegmentedControl"] {
+    display: flex !important;
+    justify-content: flex-end !important;
+    width: 100% !important;
+}
+
+div[data-testid="stVerticalBlock"]:has(#trend_range_anchor) [data-baseweb="radio"],
+div[data-testid="stVerticalBlock"]:has(#sim_range_anchor) [data-baseweb="radio"] {
+    display: flex !important;
+    justify-content: flex-end !important;
+    width: 100% !important;
+}
+
+div[data-testid="stVerticalBlock"]:has(#trend_range_anchor),
+div[data-testid="stVerticalBlock"]:has(#sim_range_anchor) {
+    width: 100% !important;
+}
+
+div[data-testid="stVerticalBlock"]:has(#trend_range_anchor) > div,
+div[data-testid="stVerticalBlock"]:has(#sim_range_anchor) > div {
+    display: flex !important;
+    justify-content: flex-end !important;
+    width: 100% !important;
+}
+
+/* Plotly “카드 2겹” 제거 */
+.stPlotlyChart {
+    background: transparent !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+}
+
+.stPlotlyChart>div {
+    border-radius: 12px !important;
+    overflow: hidden !important;
+}
+
+/* Trend/Simulator 기간 선택 segmented (segment control + radio fallback) */
+[data-testid="stSegmentedControl"] {
+    display: inline-flex !important;
+}
+
+[data-testid="stSegmentedControl"] [data-baseweb="button-group"] {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 2px !important;
+    background: rgba(6, 6, 10, 0.86) !important;
+    border: 1px solid rgba(124, 58, 237, 0.32) !important;
+    border-radius: 999px !important;
+    padding: 3px !important;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06) !important;
+}
+
+[data-testid="stSegmentedControl"] button {
+    margin: 0 !important;
+    padding: 3px 8px !important;
+    height: 22px !important;
+    border-radius: 999px !important;
+    font-size: .70rem !important;
+    color: #a6a0bf !important;
+    background: rgba(18, 18, 24, 0.92) !important;
+    border: 0 !important;
+    cursor: pointer !important;
+    user-select: none !important;
+    transition: color .15s ease, background .15s ease, box-shadow .15s ease;
+}
+
+[data-testid="stSegmentedControl"] button:hover {
+    color: #e7e4f6 !important;
+    background: rgba(30, 30, 38, 0.96) !important;
+}
+
+[data-testid="stSegmentedControl"] button[aria-pressed="true"] {
+    color: #0c0a18 !important;
+    font-weight: 700 !important;
+    background: linear-gradient(135deg, rgba(124, 58, 237, 0.95), rgba(99, 102, 241, 0.92)) !important;
+    box-shadow:
+        inset 0 0 0 1px rgba(255, 255, 255, 0.12),
+        0 4px 14px rgba(124, 58, 237, 0.35) !important;
+}
+
+/* 강제 덮어쓰기: 렌더 구조 변동 대비 */
+[role="radiogroup"],
+[role="radiogroup"] > div {
+    background: rgba(6, 6, 10, 0.96) !important;
+    border: 1px solid rgba(90, 80, 200, 0.30) !important;
+    border-radius: 999px !important;
+    padding: 3px !important;
+    gap: 2px !important;
+}
+
+[role="radiogroup"] button,
+[role="radio"],
+[role="radiogroup"] label {
+    margin: 0 !important;
+    padding: 4px 10px !important;
+    height: 24px !important;
+    border-radius: 999px !important;
+    font-size: .74rem !important;
+    color: #b7b2ce !important;
+    background: rgba(16, 16, 24, 0.92) !important;
+    border: 0 !important;
+    cursor: pointer !important;
+    user-select: none !important;
+}
+
+[role="radiogroup"] button:hover,
+[role="radio"]:hover,
+[role="radiogroup"] label:hover {
+    color: #f1eeff !important;
+    background: rgba(28, 28, 38, 0.96) !important;
+}
+
+[role="radiogroup"] button[aria-checked="true"],
+[role="radio"][aria-checked="true"],
+[role="radiogroup"] label[data-checked="true"] {
+    color: #0b0818 !important;
+    font-weight: 700 !important;
+    background: linear-gradient(135deg, rgba(124, 58, 237, 0.95), rgba(99, 102, 241, 0.92)) !important;
+    box-shadow:
+        inset 0 0 0 1px rgba(255, 255, 255, 0.18),
+        0 4px 14px rgba(124, 58, 237, 0.35) !important;
+}
+
+/* Radio fallback (old DOM) */
+[data-baseweb="radio"]>div {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 2px !important;
+    background: rgba(6, 6, 10, 0.92) !important;
+    border: 1px solid rgba(99, 102, 241, 0.25) !important;
+    border-radius: 999px !important;
+    padding: 3px !important;
+    box-shadow: inset 0 0 0 1px #ffffff00 !important;
+}
+
+[data-baseweb="radio"] input[type="radio"] {
+    opacity: 0 !important;
+    width: 0 !important;
+    height: 0 !important;
+    position: absolute !important;
+}
+
+[data-baseweb="radio"] svg {
+    display: none !important;
+}
+
+[data-baseweb="radio"] label {
+    margin: 0 !important;
+    padding: 3px 8px !important;
+    height: 22px !important;
+    border-radius: 999px !important;
+    font-size: .70rem !important;
+    color: #a6a0bf !important;
+    cursor: pointer !important;
+    user-select: none !important;
+    transition: color .15s ease, background .15s ease, box-shadow .15s ease;
+}
+
+[data-baseweb="radio"] label:hover {
+    color: #e7e4f6 !important;
+}
+
+[data-baseweb="radio"] label[data-checked="true"] {
+    color: #0c0a18 !important;
+    font-weight: 700 !important;
+    background: linear-gradient(135deg, rgba(124, 58, 237, 0.95), rgba(99, 102, 241, 0.92)) !important;
+    box-shadow:
+        inset 0 0 0 1px rgba(255, 255, 255, 0.18),
+        0 4px 14px rgba(124, 58, 237, 0.35) !important;
+}
+
+/* Slider label/tick visibility on dark theme */
+[data-testid="stSlider"] label,
+[data-testid="stSlider"] .stSliderLabel,
+[data-testid="stSlider"] p,
+[data-testid="stSlider"] span,
+[data-testid="stSlider"] div {
+    color: #fff !important;
+}
+
+[data-testid="stNumberInput"] label,
+[data-testid="stTextInput"] label {
+    color: #fff !important;
+}
+
+/* Linear date tabs (top-right fixed) for trend/simulator only */
+div[data-testid="stVerticalBlock"]:has(#trend_range_anchor) [role="radiogroup"],
+div[data-testid="stVerticalBlock"]:has(#sim_range_anchor) [role="radiogroup"] {
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    justify-content: flex-end !important;
+    align-items: center !important;
+    gap: 4px !important;
+    background: rgba(6, 6, 10, 0.86) !important;
+    border: 1px solid rgba(124, 58, 237, 0.32) !important;
+    border-radius: 999px !important;
+    padding: 4px !important;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06) !important;
+    overflow-x: auto !important;
+}
+
+div[data-testid="stVerticalBlock"]:has(#trend_range_anchor) [role="radiogroup"] label,
+div[data-testid="stVerticalBlock"]:has(#sim_range_anchor) [role="radiogroup"] label,
+div[data-testid="stVerticalBlock"]:has(#trend_range_anchor) [role="radiogroup"] button,
+div[data-testid="stVerticalBlock"]:has(#sim_range_anchor) [role="radiogroup"] button {
+    margin: 0 !important;
+    padding: 4px 10px !important;
+    height: 24px !important;
+    border-radius: 999px !important;
+    border: 0 !important;
+    color: #b7b2ce !important;
+    background: rgba(16, 16, 24, 0.92) !important;
+    font-size: .74rem !important;
+    font-weight: 600 !important;
+    box-shadow: none !important;
+}
+
+div[data-testid="stVerticalBlock"]:has(#trend_range_anchor) [role="radiogroup"] label:hover,
+div[data-testid="stVerticalBlock"]:has(#sim_range_anchor) [role="radiogroup"] label:hover,
+div[data-testid="stVerticalBlock"]:has(#trend_range_anchor) [role="radiogroup"] button:hover,
+div[data-testid="stVerticalBlock"]:has(#sim_range_anchor) [role="radiogroup"] button:hover {
+    color: #f1eeff !important;
+    background: rgba(28, 28, 38, 0.96) !important;
+}
+
+div[data-testid="stVerticalBlock"]:has(#trend_range_anchor) [role="radiogroup"] label[data-checked="true"],
+div[data-testid="stVerticalBlock"]:has(#sim_range_anchor) [role="radiogroup"] label[data-checked="true"],
+div[data-testid="stVerticalBlock"]:has(#trend_range_anchor) [role="radiogroup"] button[aria-checked="true"],
+div[data-testid="stVerticalBlock"]:has(#sim_range_anchor) [role="radiogroup"] button[aria-checked="true"] {
+    color: #0c0a18 !important;
+    font-weight: 700 !important;
+    background: linear-gradient(135deg, rgba(124, 58, 237, 0.95), rgba(99, 102, 241, 0.92)) !important;
+    box-shadow:
+        inset 0 0 0 1px rgba(255, 255, 255, 0.16),
+        0 4px 14px rgba(124, 58, 237, 0.35) !important;
+}
+
+/* Hard reset: kill old gradient/pill style on date tabs */
+div[data-testid="stVerticalBlock"]:has(#trend_range_anchor) [role="radiogroup"] *,
+div[data-testid="stVerticalBlock"]:has(#sim_range_anchor) [role="radiogroup"] *,
+div[data-testid="stVerticalBlock"]:has(#trend_range_anchor) [data-testid="stSegmentedControl"] *,
+div[data-testid="stVerticalBlock"]:has(#sim_range_anchor) [data-testid="stSegmentedControl"] * {
+    min-width: 0 !important;
+}
+
+/* Trendy segmented_control theme (anchor-scoped) */
+div[data-testid="stVerticalBlock"]:has(#trend_range_anchor) [data-testid="stSegmentedControl"] [data-baseweb="button-group"],
+div[data-testid="stVerticalBlock"]:has(#sim_range_anchor) [data-testid="stSegmentedControl"] [data-baseweb="button-group"] {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 4px !important;
+    background: rgba(6, 6, 10, 0.86) !important;
+    border: 1px solid rgba(124, 58, 237, 0.32) !important;
+    border-radius: 999px !important;
+    padding: 4px !important;
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06) !important;
+}
+
+div[data-testid="stVerticalBlock"]:has(#trend_range_anchor) [data-testid="stSegmentedControl"] button,
+div[data-testid="stVerticalBlock"]:has(#sim_range_anchor) [data-testid="stSegmentedControl"] button {
+    margin: 0 !important;
+    padding: 4px 10px !important;
+    height: 24px !important;
+    border-radius: 999px !important;
+    border: 0 !important;
+    color: #b7b2ce !important;
+    background: rgba(16, 16, 24, 0.92) !important;
+    font-size: .74rem !important;
+}
+
+div[data-testid="stVerticalBlock"]:has(#trend_range_anchor) [data-testid="stSegmentedControl"] button[aria-pressed="true"],
+div[data-testid="stVerticalBlock"]:has(#sim_range_anchor) [data-testid="stSegmentedControl"] button[aria-pressed="true"] {
+    color: #0c0a18 !important;
+    font-weight: 700 !important;
+    background: linear-gradient(135deg, rgba(124, 58, 237, 0.95), rgba(99, 102, 241, 0.92)) !important;
+    box-shadow:
+        inset 0 0 0 1px rgba(255, 255, 255, 0.16),
+        0 4px 14px rgba(124, 58, 237, 0.35) !important;
+}
+
+/* Recent Signals: full-width stable grid */
+#recent_signals_anchor {
+    display: none;
+}
+
+div[data-testid="stContainer"]:has(#recent_signals_anchor) {
+    width: 100% !important;
+}
+
+.recent-signals-head {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 2.4fr 1fr 1fr 1fr 1fr;
+    gap: 12px;
+    padding: 0.45rem 1rem 0.55rem;
+    border-bottom: 1px solid rgba(255,255,255,0.10);
+    color: #888;
+    font-size: 0.80rem;
+    font-weight: 700;
+}
+
+.recent-signals-row {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 2.4fr 1fr 1fr 1fr 1fr;
+    gap: 12px;
+    padding: 0.95rem 1rem;
+    margin-bottom: 0.5rem;
+    align-items: center;
+    border-radius: 12px;
+    font-size: 0.92rem;
+    background: rgba(20, 20, 35, 0.40);
+    border: 1px solid rgba(139, 92, 246, 0.22);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+}
+
+/* =========================
+   NOTES (anchors 기반으로만 스타일 제한)
+   ========================= */
+div[data-testid="stVerticalBlock"]:has(#notes_header_anchor) button[kind="primary"] {
+    height: 34px !important;
+    padding: 0 12px !important;
+    font-size: 0.88rem !important;
+    border-radius: 12px !important;
+    background: linear-gradient(135deg, rgba(139, 92, 246, 0.95), rgba(99, 102, 241, 0.85)) !important;
+    border: 1px solid rgba(139, 92, 246, 0.35) !important;
+    box-shadow: 0 8px 24px rgba(139, 92, 246, 0.20) !important;
+}
+
+div[data-testid="stVerticalBlock"]:has(#notes_list_anchor) button {
+    height: 30px !important;
+    padding: 0 10px !important;
+    font-size: 0.82rem !important;
+    border-radius: 10px !important;
+    background: rgba(255, 255, 255, 0.06) !important;
+    border: 1px solid rgba(255, 255, 255, 0.12) !important;
+    color: #EDEDED !important;
+}
+
+div[data-testid="stVerticalBlock"]:has(#notes_list_anchor) button:hover {
+    background: rgba(255, 255, 255, 0.10) !important;
+    border-color: rgba(139, 92, 246, 0.35) !important;
+}
+
+/* Notes list header (✅ checkbox column 포함 버전만 남김) */
+.notes-head {
+    display: grid;
+    grid-template-columns: 0.45fr 1.6fr 1fr 1fr 5fr 1.1fr;
+    padding: 0.35rem 0.25rem 0.55rem;
+    border-bottom: 2px solid rgba(139, 92, 246, 0.18);
+    margin-bottom: 0.45rem;
+    color: #666;
+    font-size: 0.74rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+}
+
+.note-divider {
+    height: 1px;
+    background: rgba(255, 255, 255, 0.06);
+    margin: 0.30rem 0;
+}
+
+.note-date {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.82rem;
+    color: #9a9a9a;
+}
+
+.note-risk {
+    font-weight: 800;
+    font-size: 0.74rem;
+}
+
+.note-toc {
+    font-family: 'JetBrains Mono', monospace;
+    color: #fff;
+    font-weight: 700;
+}
+
+.note-memo {
+    color: #cfcfcf;
+    font-size: 0.88rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+div[data-testid="stVerticalBlock"]:has(#notes_list_anchor) [data-testid="stCheckbox"] {
+    transform: scale(0.9);
+    transform-origin: left center;
+}
+
+/* =========================
+   DIALOG (New Note / Note Detail)
+   - ✅ 사이드바 자동 변동 그대로 쓰기 위해 "sbw 오프셋" 같은거 없음
+   - ✅ 입력창 글자색 Safari 포함 확실히 보이게
+   ========================= */
+div[role="dialog"],
+div[data-testid="stDialog"],
+div[data-testid="stModal"] {
+    position: fixed !important;
+    left: 50% !important;
+    top: 3vh !important;
+    transform: translateX(-50%) !important;
+
+    width: min(980px, 96vw) !important;
+    max-height: 92vh !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    padding: 0 !important;
+    z-index: 4000 !important;
+    box-sizing: border-box !important;
+
+    background: radial-gradient(circle at 40% 0%, rgba(139, 92, 246, 0.22) 0%, rgba(10, 10, 20, 0.92) 55%, rgba(0, 0, 0, 0.95) 100%) !important;
+    border: none !important;
+    border-radius: 16px !important;
+    box-shadow: 0 18px 70px rgba(0, 0, 0, 0.72) !important;
+    backdrop-filter: blur(18px) !important;
+    -webkit-backdrop-filter: blur(18px) !important;
+}
+
+dialog::backdrop {
+    background: rgba(0, 0, 0, 0.45) !important;
+    backdrop-filter: blur(6px) !important;
+    -webkit-backdrop-filter: blur(6px) !important;
+}
+
+div[data-testid="stModalOverlay"],
+div[data-testid="stDialogOverlay"],
+div[data-testid="stOverlay"],
+div[aria-label="modal-overlay"] {
+    background: rgba(0, 0, 0, 0.45) !important;
+    backdrop-filter: blur(6px) !important;
+    -webkit-backdrop-filter: blur(6px) !important;
+    z-index: 3500 !important;
+}
+
+/* dialog text 기본색 */
+div[role="dialog"] *,
+div[data-testid="stDialog"] *,
+div[data-testid="stModal"] * {
+    color: rgba(237, 237, 237, 0.94);
+}
+
+/* modal inner area: align content to frame and avoid clipping */
+div[role="dialog"] [data-testid="stDialogHeader"],
+div[data-testid="stDialog"] [data-testid="stDialogHeader"],
+div[data-testid="stModal"] [data-testid="stDialogHeader"] {
+    padding: 0.35rem 1.1rem 0.15rem !important;
+}
+
+div[role="dialog"] [data-testid="stDialogContent"],
+div[data-testid="stDialog"] [data-testid="stDialogContent"],
+div[data-testid="stModal"] [data-testid="stDialogContent"] {
+    padding: 0.65rem 1.1rem 1.3rem !important;
+    max-height: calc(92vh - 2.8rem) !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    box-sizing: border-box !important;
+    width: 100% !important;
+}
+
+/* fallback if dialog content lacks testid */
+div[role="dialog"] > div:first-child,
+div[data-testid="stDialog"] > div:first-child,
+div[data-testid="stModal"] > div:first-child {
+    padding: 1.2rem !important;
+    max-height: calc(92vh - 2px) !important;
+    overflow: auto !important;
+    box-sizing: border-box !important;
+    width: 100% !important;
+}
+
+/* 추가 fallback: dialog 직계 자식에 padding 강제 (구조 불명일 때) */
+div[role="dialog"] > div,
+div[data-testid="stDialog"] > div,
+div[data-testid="stModal"] > div {
+    box-sizing: border-box !important;
+    width: 100% !important;
+}
+
+/* dialog 내부 요소가 프레임 넘지 않게 */
+div[role="dialog"] .element-container,
+div[data-testid="stDialog"] .element-container,
+div[data-testid="stModal"] .element-container,
+div[role="dialog"] [data-testid="stVerticalBlock"],
+div[data-testid="stDialog"] [data-testid="stVerticalBlock"],
+div[data-testid="stModal"] [data-testid="stVerticalBlock"] {
+    max-width: 100% !important;
+    width: 100% !important;
+}
+
+div[role="dialog"] textarea,
+div[data-testid="stDialog"] textarea,
+div[data-testid="stModal"] textarea {
+    width: 100% !important;
+}
+
+div[role="dialog"] [data-testid="stFileUploader"] section,
+div[data-testid="stDialog"] [data-testid="stFileUploader"] section,
+div[data-testid="stModal"] [data-testid="stFileUploader"] section {
+    width: 100% !important;
+}
+
+/* attachments list in Note Detail modal */
+div[role="dialog"] [data-testid="stVerticalBlockBorderWrapper"],
+div[data-testid="stDialog"] [data-testid="stVerticalBlockBorderWrapper"],
+div[data-testid="stModal"] [data-testid="stVerticalBlockBorderWrapper"] {
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    max-height: 54vh !important;
+}
+/* modal 내부 요소가 튀어나오지 않게 최대폭 제한 */
+div[role="dialog"] *,
+div[data-testid="stDialog"] *,
+div[data-testid="stModal"] * {
+    max-width: 100% !important;
+}
+
+/* close button aligned and framed */
+div[role="dialog"] button[aria-label="Close"],
+div[data-testid="stDialog"] button[aria-label="Close"],
+div[data-testid="stModal"] button[aria-label="Close"] {
+    background: rgba(255, 255, 255, 0.08) !important;
+    border: 1px solid rgba(255, 255, 255, 0.16) !important;
+    border-radius: 10px !important;
+    margin: 0.25rem 0.25rem 0 0 !important;
+}
+
+/* ✅ 메모 입력창: “뷰 테마 그대로” + 글자 확실히 */
+div[role="dialog"] textarea,
+div[role="dialog"] input,
+div[data-testid="stDialog"] textarea,
+div[data-testid="stDialog"] input,
+div[data-testid="stModal"] textarea,
+div[data-testid="stModal"] input,
+div[data-testid="stDialog"] [data-testid="stTextArea"] textarea,
+div[data-testid="stModal"] [data-testid="stTextArea"] textarea {
+    background: rgba(12, 12, 20, 0.72) !important;
+    border: 1px solid rgba(139, 92, 246, 0.22) !important;
+    border-radius: 14px !important;
+
+    color: rgba(255, 255, 255, 0.92) !important;
+    -webkit-text-fill-color: rgba(255, 255, 255, 0.92) !important;
+    /* Safari에서 글자 안보이는거 방지 */
+    caret-color: rgba(255, 255, 255, 0.92) !important;
+
+    box-shadow: none !important;
+}
+
+div[role="dialog"] textarea::placeholder,
+div[role="dialog"] input::placeholder,
+div[data-testid="stDialog"] textarea::placeholder,
+div[data-testid="stDialog"] input::placeholder,
+div[data-testid="stModal"] textarea::placeholder,
+div[data-testid="stModal"] input::placeholder {
+    color: rgba(255, 255, 255, 0.50) !important;
+}
+
+div[role="dialog"] textarea:focus,
+div[role="dialog"] input:focus,
+div[data-testid="stDialog"] textarea:focus,
+div[data-testid="stDialog"] input:focus,
+div[data-testid="stModal"] textarea:focus,
+div[data-testid="stModal"] input:focus {
+    border-color: rgba(139, 92, 246, 0.60) !important;
+    box-shadow: 0 0 0 1px rgba(139, 92, 246, 0.60) !important;
+}
+
+/* file uploader 시스루 + 버튼 글자 보이게 */
+div[role="dialog"] [data-testid="stFileUploader"] section,
+div[data-testid="stDialog"] [data-testid="stFileUploader"] section,
+div[data-testid="stModal"] [data-testid="stFileUploader"] section {
+    background: rgba(14, 14, 26, 0.78) !important;
+    border: 1px dashed rgba(139, 92, 246, 0.34) !important;
+    border-radius: 14px !important;
+}
+
+div[role="dialog"] [data-testid="stFileUploader"] button,
+div[data-testid="stDialog"] [data-testid="stFileUploader"] button,
+div[data-testid="stModal"] [data-testid="stFileUploader"] button {
+    background: linear-gradient(135deg, rgba(139, 92, 246, 0.95), rgba(99, 102, 241, 0.88)) !important;
+    color: #f5f3ff !important;
+    border: 1px solid rgba(139, 92, 246, 0.40) !important;
+    border-radius: 12px !important;
+    box-shadow: 0 8px 24px rgba(139, 92, 246, 0.24) !important;
+}
+
+div[role="dialog"] [data-testid="stFileUploader"] button *,
+div[data-testid="stDialog"] [data-testid="stFileUploader"] button *,
+div[data-testid="stModal"] [data-testid="stFileUploader"] button * {
+    color: #f5f3ff !important;
+}
+
+/* Simulator cards */
+#sim_controls_anchor,
+#sim_chart_anchor,
+#sim_result_anchor {
+    display: none;
+}
+
+div[data-testid="stContainer"]:has(#sim_controls_anchor),
+div[data-testid="stContainer"]:has(#sim_chart_anchor),
+div[data-testid="stContainer"]:has(#sim_result_anchor) {
+    position: relative;
+    background: var(--glass);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border: 1px solid var(--borderStrong);
+    border-radius: 16px;
+    box-shadow: 0 4px 30px rgba(0, 0, 0, .50);
+    padding: 1.25rem;
+    overflow: hidden;
+}
+
+/* dialog primary button */
+div[role="dialog"] button[kind="primary"],
+div[data-testid="stDialog"] button[kind="primary"],
+div[data-testid="stModal"] button[kind="primary"] {
+    background: linear-gradient(135deg, rgba(139, 92, 246, 0.95), rgba(99, 102, 241, 0.85)) !important;
+    border: 1px solid rgba(139, 92, 246, 0.35) !important;
+    border-radius: 14px !important;
+    box-shadow: 0 12px 28px rgba(139, 92, 246, 0.22) !important;
+}
+
+/* dialog secondary buttons (Cancel 등 hover 전에도 보이게) */
+div[role="dialog"] button:not([kind="primary"]),
+div[data-testid="stDialog"] button:not([kind="primary"]),
+div[data-testid="stModal"] button:not([kind="primary"]) {
+    background: rgba(255, 255, 255, 0.08) !important;
+    border: 1px solid rgba(255, 255, 255, 0.14) !important;
+    color: rgba(237, 237, 237, 0.94) !important;
+}
+
+div[role="dialog"] button:not([kind="primary"]):hover,
+div[data-testid="stDialog"] button:not([kind="primary"]):hover,
+div[data-testid="stModal"] button:not([kind="primary"]):hover {
+    background: rgba(255, 255, 255, 0.12) !important;
+    border-color: rgba(139, 92, 246, 0.35) !important;
+}
+
+/* memo box (read-only display style if you use it somewhere) */
+.note-memo-box {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 14px;
+    padding: 1.25rem;
+    line-height: 1.65;
+    color: #ddd;
+}
+
+/* =========================================================
+   Memo textarea: "뷰에서 보던 어두운 메모 박스" 그대로 + 수정 가능
+   - New Note / View 둘 다 동일하게 적용됨
+   ========================================================= */
+div[role="dialog"] .memo-dark-wrap textarea,
+div[data-testid="stDialog"] .memo-dark-wrap textarea,
+div[data-testid="stModal"] .memo-dark-wrap textarea,
+div[data-testid="stDialog"] [data-testid="stTextArea"] textarea,
+div[data-testid="stModal"] [data-testid="stTextArea"] textarea {
+    background: rgba(10, 10, 20, 0.82) !important;
+    /* ✅ 어둡게 */
+    border: 1px solid rgba(139, 92, 246, 0.22) !important;
+    /* ✅ 보라 테두리 */
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06) !important;
+    color: rgba(255, 255, 255, 0.92) !important;
+    /* ✅ 흰 폰트 */
+    -webkit-text-fill-color: rgba(255, 255, 255, 0.92) !important;
+    /* Safari */
+    caret-color: rgba(255, 255, 255, 0.92) !important;
+    border-radius: 14px !important;
+}
+
+div[role="dialog"] .memo-dark-wrap textarea::placeholder,
+div[data-testid="stDialog"] .memo-dark-wrap textarea::placeholder,
+div[data-testid="stModal"] .memo-dark-wrap textarea::placeholder {
+    color: rgba(255, 255, 255, 0.45) !important;
+}
+
+div[role="dialog"] .memo-dark-wrap textarea:focus,
+div[data-testid="stDialog"] .memo-dark-wrap textarea:focus,
+div[data-testid="stModal"] .memo-dark-wrap textarea:focus {
+    border-color: rgba(139, 92, 246, 0.60) !important;
+    box-shadow:
+        0 0 0 1px rgba(139, 92, 246, 0.60),
+        inset 0 0 0 1px rgba(255, 255, 255, 0.06) !important;
+}
+
+/* New Note memo */
+div[role="dialog"] textarea[id*="memo_dark_create"],
+div[data-testid="stDialog"] textarea[id*="memo_dark_create"],
+div[data-testid="stModal"] textarea[id*="memo_dark_create"] {
+    background: rgba(10, 10, 20, 0.82) !important;
+    border: 1px solid rgba(139, 92, 246, 0.28) !important;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06) !important;
+    color: rgba(255, 255, 255, 0.92) !important;
+    -webkit-text-fill-color: rgba(255, 255, 255, 0.92) !important;
+    caret-color: rgba(255, 255, 255, 0.92) !important;
+}
+
+/* View/Edit memo */
+div[role="dialog"] textarea[id*="memo_dark_edit_"],
+div[data-testid="stDialog"] textarea[id*="memo_dark_edit_"],
+div[data-testid="stModal"] textarea[id*="memo_dark_edit_"] {
+    background: rgba(10, 10, 20, 0.82) !important;
+    border: 1px solid rgba(139, 92, 246, 0.28) !important;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06) !important;
+    color: rgba(255, 255, 255, 0.92) !important;
+    -webkit-text-fill-color: rgba(255, 255, 255, 0.92) !important;
+    caret-color: rgba(255, 255, 255, 0.92) !important;
+}

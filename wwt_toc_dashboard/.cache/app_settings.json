@@ -1,0 +1,11 @@
+{
+  "main_target_toc": 25.0,
+  "main_warn_ratio": 0.6,
+  "main_alarm_ratio": 0.8,
+  "sim_default_target_toc": 20.0,
+  "flow_capacity_tph": 500.0,
+  "flow_high_threshold_tph": 400.0,
+  "ollama_model": "qwen2.5:7b-instruct",
+  "diag_drawer_width_px": 420,
+  "diag_main_scale": 0.92
+}
