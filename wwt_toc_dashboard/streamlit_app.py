@@ -16,7 +16,12 @@ from core.data import load_raw_csv, pick_latest, slice_by_range, ensure_pred_col
 from core.signals import classify_signal, badge_pill_html, signal_label_ko
 from core.automl_infer import predict_multi_leads_from_automl
 from core.llm_advisor import run_llm_advisor, build_quick_report
-from core.simulator import fit_quadratic_response_model, recommend_optimal_controls_24h, do_optimal_target_by_mlss
+from core.simulator import (
+    fit_quadratic_response_model,
+    recommend_optimal_controls_24h,
+    recommend_optimal_controls_12h,
+    do_optimal_target_by_mlss,
+)
 from core.settings_store import load_app_settings
 
 DIAG_EXECUTOR = ThreadPoolExecutor(max_workers=1)
@@ -305,7 +310,9 @@ def _build_diag_sections(ctx: dict, status: str) -> list[tuple[str, list[str]]]:
 def _build_local_actions(ctx: dict, status: str) -> list[dict]:
     if status == "양호":
         return []
-    opt = ctx.get("sim_opt_24h")
+    opt = ctx.get("sim_opt_12h")
+    if not isinstance(opt, dict):
+        opt = ctx.get("sim_opt_24h")
     out: list[dict] = []
     if isinstance(opt, dict) and bool(opt.get("ok")) and isinstance(opt.get("best"), dict):
         b = opt.get("best", {})
@@ -324,7 +331,7 @@ def _build_local_actions(ctx: dict, status: str) -> list[dict]:
                         "target": target,
                         "delta": d,
                         "eta_hours": eta,
-                        "reason": "시뮬레이터 기준 24시간 TOC 최소화 조합",
+                        "reason": "시뮬레이터 기준 12시간 TOC 최소화 조합",
                     }
                 )
     return out[:3]
@@ -355,6 +362,36 @@ def _status_from_ctx(ctx: dict) -> str:
     if float(ref) >= float(warn):
         return "경고"
     return "양호"
+
+
+def _trend_label_from_slope(v) -> str:
+    if not isinstance(v, (int, float)):
+        return "안정"
+    if v > 0.01:
+        return "상승"
+    if v < -0.01:
+        return "하락"
+    return "안정"
+
+
+def _fm_level(fm) -> str:
+    if not isinstance(fm, (int, float)):
+        return "정보부족"
+    if fm < 0.08:
+        return "저부하"
+    if fm >= 0.20:
+        return "고부하"
+    return "적정"
+
+
+def _risk_level(v, warn, alarm) -> str:
+    if not isinstance(v, (int, float)):
+        return "중간"
+    if v >= alarm:
+        return "높음"
+    if v >= warn:
+        return "중간"
+    return "낮음"
 
 
 @st.cache_data(ttl=180)
@@ -619,7 +656,9 @@ with c_center:
                 daf_slope = _recent_slope(df[daf_col], h=12) if daf_col else float("nan")
                 eq_daf_rise_room = bool((pd.notna(eq_slope) and eq_slope > 0.015) or (pd.notna(daf_slope) and daf_slope > 0.015))
                 do_trend = _recent_slope(df["AERB_DO"], h=12) if "AERB_DO" in df.columns else float("nan")
+                toc_slope_6h = _recent_slope(df["FINAL_TOC"], h=6) if "FINAL_TOC" in df.columns else float("nan")
                 do_trend_text = "상승" if pd.notna(do_trend) and do_trend > 0.01 else ("하락" if pd.notna(do_trend) and do_trend < -0.01 else "보합")
+                aerb_fm = pick_latest(df, "AERB_FM")
                 process_drop_risk = bool(
                     high_inflow
                     and pd.notna(latest_toc)
@@ -631,6 +670,20 @@ with c_center:
                 delay_profile_diag = load_delay_profile_for_diag(str(delay_profile_path), str(delay_search_summary_path))
                 reco_strength = load_reco_strength_profile(str(APP_DIR.parent / "wwt-toc-automl" / "outputs" / "reports"), last_days=30)
                 sim_opt_24h = recommend_optimal_controls_24h(
+                    current_toc=float(latest_toc) if pd.notna(latest_toc) else float("nan"),
+                    p6=float(p6_ctx) if pd.notna(p6_ctx) else float("nan"),
+                    p12=float(p12_ctx) if pd.notna(p12_ctx) else float("nan"),
+                    p24=float(p24_ctx) if pd.notna(p24_ctx) else float("nan"),
+                    current_do=float(aerb_do) if pd.notna(aerb_do) else float("nan"),
+                    current_ret=float(aerb_ret) if pd.notna(aerb_ret) else float("nan"),
+                    current_wit=float(aerb_wit) if pd.notna(aerb_wit) else float("nan"),
+                    response_model=response_model_diag,
+                    delay_profile=delay_profile_diag,
+                    current_mlss=float(aerb_mlss) if pd.notna(aerb_mlss) else float("nan"),
+                    mlss_q_low=float(mlss_q_low) if pd.notna(mlss_q_low) else float("nan"),
+                    mlss_q_high=float(mlss_q_high) if pd.notna(mlss_q_high) else float("nan"),
+                )
+                sim_opt_12h = recommend_optimal_controls_12h(
                     current_toc=float(latest_toc) if pd.notna(latest_toc) else float("nan"),
                     p6=float(p6_ctx) if pd.notna(p6_ctx) else float("nan"),
                     p12=float(p12_ctx) if pd.notna(p12_ctx) else float("nan"),
@@ -657,6 +710,7 @@ with c_center:
                     "AERB_WIT": float(aerb_wit) if pd.notna(aerb_wit) else None,
                     "AERB_RET": float(aerb_ret) if pd.notna(aerb_ret) else None,
                     "AERB_MLSS": float(aerb_mlss) if pd.notna(aerb_mlss) else None,
+                    "AERB_FM": float(aerb_fm) if pd.notna(aerb_fm) else None,
                     "mlss_band": mlss_band,
                     "mlss_recommended_do": float(rec_do) if pd.notna(rec_do) else None,
                     "flow_capacity_tph": flow_capacity,
@@ -666,6 +720,7 @@ with c_center:
                     "process_drop_risk": process_drop_risk,
                     "do_trend": do_trend_text,
                     "pred_shape": pred_shape,
+                    "toc_slope_6h": float(toc_slope_6h) if pd.notna(toc_slope_6h) else None,
                     "eq_toc_slope_12h": float(eq_slope) if pd.notna(eq_slope) else None,
                     "daf_toc_slope_12h": float(daf_slope) if pd.notna(daf_slope) else None,
                     "eq_daf_rise_room": eq_daf_rise_room,
@@ -673,6 +728,7 @@ with c_center:
                     "eq_toc_warn": EQ_TOC_WARN,
                     "delay_summary": delay_summary,
                     "sim_opt_24h": sim_opt_24h,
+                    "sim_opt_12h": sim_opt_12h,
                     "reco_strength_profile": reco_strength,
                     "primary_reco_lead": 24,
                     "thresholds": {"warn": WARN_TOC, "alarm": ALARM_TOC},
@@ -893,116 +949,172 @@ with c_center:
         diagnosis = "" if status == "양호" else "운전 안정성 점검이 필요합니다."
         source = escape(str(diag_state.get("source", "rule_local"))) if isinstance(diag_state, dict) else "rule_local"
         source = f"{source} · ui-v3"
-        # Never render raw payload body lists directly (prevents HTML-noise leakage).
-        actions = _build_local_actions(cctx, status)
-        watchpoints = _build_local_watchpoints(cctx)
-
-        actions_html = ""
-        if isinstance(actions, list):
-            for a in actions[:3]:
-                if not isinstance(a, dict):
-                    continue
-                try:
-                    dlt = float(a.get("delta", 0.0))
-                except Exception:
-                    dlt = 0.0
-                target_name = str(a.get("target", "")).upper()
-                dlt_txt = f"{dlt:+.2f}%p" if target_name == "AERB_RET" else f"{dlt:+.2f}"
-                actions_html += (
-                    f'<div class="diag-action-card">'
-                    f'<div class="diag-action-head">'
-                    f'<b>{escape(_disp_target_name(a.get("target","")))} {dlt_txt}</b>'
-                    f'<span>{escape(str(a.get("eta_hours","")))}</span>'
-                    f"</div>"
-                    f'<div class="diag-action-reason">{escape(_clean_diag_text(str(a.get("reason",""))))}</div>'
-                    f"</div>"
-                )
-        wp_html = ""
-        if isinstance(watchpoints, list):
-            for w in watchpoints[:4]:
-                w_clean = _force_plain_or_fallback(str(w), "")
-                if w_clean:
-                    wp_html += f"<li>{escape(w_clean)}</li>"
         flow_now = cctx.get("FLOW")
-        flow_pct = cctx.get("flow_load_pct")
         do_now = cctx.get("AERB_DO")
         do_rec = cctx.get("mlss_recommended_do")
-        # Build section lines directly from numeric context only (no payload text usage).
-        sec12_raw: list[str] = []
-        sec24_raw: list[str] = []
+        fm_now = cctx.get("AERB_FM")
+        mlss_now = cctx.get("AERB_MLSS")
+        toc_slope_6h = cctx.get("toc_slope_6h")
         cur_v = cctx.get("current_toc")
         p12_v = cctx.get("pred_t12")
         p24_v = cctx.get("pred_t24")
-        if isinstance(cur_v, (int, float)) and isinstance(p12_v, (int, float)):
-            d12 = float(p12_v) - float(cur_v)
-            tr12 = "상승" if d12 > 0 else ("하락" if d12 < 0 else "보합")
-            sec12_raw.append(f"현재 최종 TOC {float(cur_v):.2f} 기준, 12시간 뒤 예측은 {float(p12_v):.2f}({tr12}, {d12:+.2f})입니다.")
-        if isinstance(do_now, (int, float)) and isinstance(do_rec, (int, float)):
-            gap = float(do_now) - float(do_rec)
-            sec12_raw.append(f"폭기조 DO양은 현재 {float(do_now):.2f}, 권장 {float(do_rec):.2f}로 편차 {gap:+.2f}입니다.")
-        if status == "양호":
-            sec12_raw.append("즉시 대규모 조정보다는 모니터링 중심 운전이 적절합니다.")
+        ret_now = cctx.get("AERB_RET")
+        wit_now = cctx.get("AERB_WIT")
+        eq_toc = cctx.get("EQ_TOC")
+        high_inflow = bool(cctx.get("high_inflow", False))
+        warn_v = float((cctx.get("thresholds", {}) or {}).get("warn", WARN_TOC))
+        alarm_v = float((cctx.get("thresholds", {}) or {}).get("alarm", ALARM_TOC))
 
-        if isinstance(p24_v, (int, float)):
-            if isinstance(p12_v, (int, float)):
-                span = abs(float(p24_v) - float(p12_v))
-                band = max(0.20, 0.35 * span)
-                lo, hi = float(p24_v) - band, float(p24_v) + band
-                sec24_raw.append(f"24시간 뒤 예상 TOC는 {float(p24_v):.2f}, 리스크 범위는 {lo:.2f}~{hi:.2f}입니다.")
-            else:
-                sec24_raw.append(f"24시간 뒤 예상 TOC는 {float(p24_v):.2f}입니다.")
-        if isinstance(flow_now, (int, float)):
-            if bool(cctx.get("high_inflow", False)):
-                sec24_raw.append(f"현재 유입량 {float(flow_now):.0f}t/h로 고유입 구간이며, 24시간 리스크를 보수적으로 모니터링해야 합니다.")
-            else:
-                sec24_raw.append(f"현재 유입량 {float(flow_now):.0f}t/h로, 24시간 리스크는 운전값 미세 조정으로 관리 가능한 구간입니다.")
+        def _fmt(v, d=2, suffix=""):
+            if isinstance(v, (int, float)) and pd.notna(v):
+                return f"{float(v):.{d}f}{suffix}"
+            return "-"
 
-        def _safe_list_html(lines: list[str]) -> str:
-            out: list[str] = []
-            for x in lines[:4]:
-                s = _force_plain_or_fallback(str(x), "")
-                if not s:
-                    continue
-                low = s.lower()
-                if any(tok in low for tok in ["<div", "&lt;div", "class=", "diag-drawer", "/div", "/ul", "/li"]):
-                    continue
-                out.append(f"<li>{escape(s)}</li>")
-            return "".join(out) if out else "<li>표시 가능한 분석 문장이 없습니다.</li>"
-
-        sec12_lis = _safe_list_html(sec12_raw)
-        sec24_lis = _safe_list_html(sec24_raw)
-        diagnosis_html = "" if status == "양호" else f'<div class="diag-drawer-source" style="margin-top:-.35rem;">{escape(diagnosis)}</div>'
-        flow_text = (
-            f"{float(flow_now):.0f} t/h"
-            if isinstance(flow_now, (int, float)) and isinstance(flow_pct, (int, float))
-            else "-"
-        )
-        do_text = (
-            f"{float(do_now):.2f} / 권장 {float(do_rec):.2f}"
+        fm_level = _fm_level(fm_now)
+        trend6 = _trend_label_from_slope(toc_slope_6h)
+        if high_inflow:
+            proc_state = "부하증가"
+        elif fm_level == "저부하":
+            proc_state = "저부하"
+        else:
+            proc_state = "안정"
+        do_gap = (
+            float(do_now) - float(do_rec)
             if isinstance(do_now, (int, float)) and isinstance(do_rec, (int, float))
-            else "-"
+            else float("nan")
         )
+        if isinstance(p12_v, (int, float)) and isinstance(cur_v, (int, float)):
+            d12 = float(p12_v) - float(cur_v)
+            trend12 = "상승" if d12 > 0.01 else ("하락" if d12 < -0.01 else "유지")
+        else:
+            trend12 = "유지"
+        if isinstance(p24_v, (int, float)) and isinstance(cur_v, (int, float)):
+            d24all = float(p24_v) - float(cur_v)
+            interp24 = "상승가능성" if d24all > 0.2 else ("안정유지" if d24all >= -0.2 else "안정개선")
+        else:
+            interp24 = "안정유지"
+
+        b12 = max(0.15, 0.30 * abs(float(p12_v) - float(cur_v))) if isinstance(p12_v, (int, float)) and isinstance(cur_v, (int, float)) else 0.20
+        b24 = max(0.20, 0.35 * abs(float(p24_v) - float(p12_v))) if isinstance(p24_v, (int, float)) and isinstance(p12_v, (int, float)) else 0.30
+        p12_lo = float(p12_v) - b12 if isinstance(p12_v, (int, float)) else float("nan")
+        p12_hi = float(p12_v) + b12 if isinstance(p12_v, (int, float)) else float("nan")
+        p24_lo = float(p24_v) - b24 if isinstance(p24_v, (int, float)) else float("nan")
+        p24_hi = float(p24_v) + b24 if isinstance(p24_v, (int, float)) else float("nan")
+        risk24 = _risk_level(p24_v, warn_v, alarm_v)
+
+        if fm_level == "저부하":
+            load_interp = "현재 저부하 상태로 내생호흡 증가 및 슬러지 노화 가능성이 있습니다. SRT 과상승 여부를 확인하십시오."
+        elif fm_level == "고부하":
+            load_interp = "고부하 상태로 DO 부족 및 방류 TOC 상승 리스크가 존재합니다. 산소 공급 및 반송 조정을 검토하십시오."
+        elif high_inflow:
+            load_interp = "유입부하가 높은 구간입니다. 폭기조 DO양과 반송량을 우선 모니터링하고 급격한 부하 변동에 대비하십시오."
+        else:
+            load_interp = "적정 부하 범위로 생물 활성은 안정적으로 유지되고 있습니다."
+
+        sim_opt = cctx.get("sim_opt_12h")
+        if not isinstance(sim_opt, dict):
+            sim_opt = cctx.get("sim_opt_24h")
+        best = sim_opt.get("best", {}) if isinstance(sim_opt, dict) and isinstance(sim_opt.get("best"), dict) else {}
+        best_do = (float(do_now) + float(best.get("do_delta", 0.0))) if isinstance(do_now, (int, float)) else float("nan")
+        best_ret = (float(ret_now) + float(best.get("ret_delta_pct", 0.0))) if isinstance(ret_now, (int, float)) else float("nan")
+        best_wit = (float(wit_now) + float(best.get("wit_delta", 0.0))) if isinstance(wit_now, (int, float)) else float("nan")
+        best_toc = best.get("sim_t12", p12_v if isinstance(p12_v, (int, float)) else cur_v)
+
+        # Safe scenario is intentionally omitted by request; keep only "Best (TOC 최소)".
+
+        need_action = bool(best) and (
+            abs(float(best.get("do_delta", 0.0))) > 1e-6
+            or abs(float(best.get("ret_delta_pct", 0.0))) > 1e-6
+            or abs(float(best.get("wit_delta", 0.0))) > 1e-6
+        )
+        actions_html = ""
+        if need_action:
+            actions_html = (
+                f"<div class='diag-action-card'><b>① DO 목표 {_fmt(do_now,2,' ppm')} → {_fmt(best_do,2,' ppm')} 조정</b>"
+                f"<span>기대 효과: TOC 안정화 및 산소 공급 균형</span>"
+                f"<span>모니터링: DO 과하강 여부 및 6h TOC 추이 확인</span></div>"
+                f"<div class='diag-action-card'><b>② 반송량 {_fmt(ret_now,2,'%')} → {_fmt(best_ret,2,'%')} 조정</b>"
+                f"<span>기대 효과: 슬러지 농도 안정화</span>"
+                f"<span>리스크: 침전지 수리부하 증가 가능</span></div>"
+                f"<div class='diag-action-card'><b>③ 인발량 {_fmt(wit_now,2,' t/h')} → {_fmt(best_wit,2,' t/h')} 조정</b>"
+                f"<span>기대 효과: SRT 안정화</span>"
+                f"<span>리스크: 질산화 균 wash-out 여부 확인</span></div>"
+            )
+        else:
+            actions_html = (
+                "<div class='diag-action-card'>"
+                "<b>현재 즉각적인 조정은 필요하지 않습니다.</b>"
+                "<span>모니터링 중심 운전을 권장합니다.</span>"
+                "</div>"
+            )
+
+        flow_text = _fmt(flow_now, 0, " t/h")
+        do_text = f"{_fmt(do_now,2,' ppm')} / 권장 {_fmt(do_rec,2,' ppm')}"
+        status_line = f"현재 최종 TOC {_fmt(cur_v,2)} mg/L, 유입 {flow_text} 조건에서 공정은 {proc_state} 상태입니다."
+        source_clean = _force_plain_or_fallback(source, "rule_local · ui-v3")
 
         drawer_html = dedent(
             f"""
             <div class="diag-drawer open" style="position:fixed;top:0;right:0;width:{DIAG_DRAWER_WIDTH}px;height:100dvh;z-index:1200;">
                 <div class="diag-drawer-head">AI 운전 진단</div>
-                <div class="diag-drawer-source">{source}</div>
+                <div class="diag-drawer-source">{escape(source_clean)}</div>
                 <div class="diag-kpi-grid">
                     <div class="diag-kpi-card"><span>유입부하</span><b>{escape(flow_text)}</b></div>
                     <div class="diag-kpi-card"><span>폭기조 DO양</span><b>{escape(do_text)}</b></div>
                 </div>
-                <div class="diag-drawer-sec">1) 상태 요약</div>
-                <div class="diag-drawer-status" style="color:{color};">{status}</div>
-                {diagnosis_html}
-                <div class="diag-drawer-sec">2) 상세 분석</div>
-                <div class='diag-drawer-sec'>2-1) 12시간 운전 진단</div>
-                <div class='diag-drawer-body'><ul class='diag-report-list'>{sec12_lis}</ul></div>
-                <div class='diag-drawer-sec'>2-2) 24시간 리스크 전망</div>
-                <div class='diag-drawer-body'><ul class='diag-report-list'>{sec24_lis}</ul></div>
-                {"<div class='diag-drawer-sec'>3) 권장 조치</div><div class='diag-action-wrap'>" + actions_html + "</div>" if actions_html else ""}
-                <div class="diag-drawer-sec">4) 모니터링 포인트</div>
-                <ul class="diag-drawer-list">{wp_html if wp_html else "<li>포인트 없음</li>"}</ul>
+                <div class="diag-card">
+                    <div class="diag-card-title">1) AI 종합 진단</div>
+                    <div class="diag-drawer-status" style="color:{color};">{status}</div>
+                    <div class="diag-card-body">{escape(status_line)}</div>
+                    <ul class="diag-drawer-list">
+                        <li>폭기조 DO {_fmt(do_now,2)} (목표 {_fmt(do_rec,2)}, 편차 {_fmt(do_gap,2)})</li>
+                        <li>F/M {_fmt(fm_now,3)} → {fm_level}</li>
+                        <li>최근 6h TOC 추이 {trend6}</li>
+                    </ul>
+                </div>
+
+                <div class="diag-card">
+                    <div class="diag-card-title">2) 운전 예측 및 리스크 전망</div>
+                    <div class="diag-card-body">
+                        <b>12시간 예측</b><br/>
+                        12시간 후 예상 TOC: {_fmt(p12_v,2)} mg/L ({trend12})<br/>
+                        변동 범위: {_fmt(p12_lo,2)} ~ {_fmt(p12_hi,2)}<br/><br/>
+                        <b>24시간 리스크</b><br/>
+                        24시간 후 예상 TOC: {_fmt(p24_v,2)} mg/L<br/>
+                        리스크 범위: {_fmt(p24_lo,2)} ~ {_fmt(p24_hi,2)}<br/>
+                        리스크 수준: {risk24}<br/><br/>
+                        현재 조건 유지 시 {interp24}이 예상됩니다.
+                    </div>
+                </div>
+
+                <div class="diag-card">
+                    <div class="diag-card-title">3) 부하 및 생물 상태 진단</div>
+                    <ul class="diag-drawer-list">
+                        <li>F/M = {_fmt(fm_now,3)} → {fm_level}</li>
+                        <li>MLSS = {_fmt(mlss_now,1)}</li>
+                        <li>유입 TOC 로딩 = {_fmt(eq_toc,2)}</li>
+                    </ul>
+                    <div class="diag-card-body">{escape(load_interp)}</div>
+                </div>
+
+                <div class="diag-card">
+                    <div class="diag-card-title">4) 권장 운전 조치 (우선순위)</div>
+                    <div class="diag-action-wrap">{actions_html}</div>
+                </div>
+
+                <div class="diag-card">
+                    <div class="diag-card-title">5) 시뮬레이터 추천 운전 조합</div>
+                    <div class="diag-sim-grid">
+                        <div class="diag-sim-card diag-sim-best">
+                            <b>Best (TOC 최소)</b>
+                            <span>DO: {_fmt(best_do,2,' ppm')}</span>
+                            <span>RET: {_fmt(best_ret,2,'%')}</span>
+                            <span>WIT: {_fmt(best_wit,2,' t/h')}</span>
+                            <span>예상 12h TOC: {_fmt(best_toc,2)}</span>
+                            <span>리스크: {_risk_level(best_toc, warn_v, alarm_v)}</span>
+                        </div>
+                    </div>
+                </div>
             </div>
             """
         ).strip()

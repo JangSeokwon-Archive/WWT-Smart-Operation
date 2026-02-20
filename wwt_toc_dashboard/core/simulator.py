@@ -281,6 +281,7 @@ def estimate_sim_t24(
     mlss_q_high: float = float("nan"),
 ) -> dict:
     base_curve = _base_curve_24h(current_toc=current_toc, p6=p6, p12=p12, p24=p24)
+    base_t12 = float(base_curve[12]) if len(base_curve) > 12 else float("nan")
     base_t24 = float(base_curve[-1]) if len(base_curve) else float("nan")
 
     do_now = float(current_do) if np.isfinite(current_do) else 1.8
@@ -314,11 +315,16 @@ def estimate_sim_t24(
         cap=3.5,
     )
     delay_t24 = float(delay_curve[-1]) if len(delay_curve) else 0.0
+    delay_t12 = float(delay_curve[12]) if len(delay_curve) > 12 else 0.0
+    sim_t12 = float(base_t12 + static_delta + delay_t12)
     sim_t24 = float(base_t24 + static_delta + delay_t24)
 
     return {
+        "base_t12": base_t12,
         "base_t24": base_t24,
+        "sim_t12": sim_t12,
         "sim_t24": sim_t24,
+        "delta_t12": float(sim_t12 - base_t12),
         "delta_t24": float(sim_t24 - base_t24),
         "do_delta": float(do_delta),
         "ret_delta_pct": float(ret_delta_pct),
@@ -406,6 +412,91 @@ def recommend_optimal_controls_24h(
     return {
         "ok": True,
         "base_t24": float(base_t24),
+        "best": best,
+        "top3": top3,
+    }
+
+
+def recommend_optimal_controls_12h(
+    current_toc: float,
+    p6: float,
+    p12: float,
+    p24: float,
+    current_do: float,
+    current_ret: float,
+    current_wit: float,
+    response_model: dict | None = None,
+    delay_profile: dict | None = None,
+    current_mlss: float = float("nan"),
+    mlss_q_low: float = float("nan"),
+    mlss_q_high: float = float("nan"),
+) -> dict:
+    do_grid = [-0.6, -0.4, -0.2, 0.0, 0.2, 0.4, 0.6]
+    ret_grid = [-10.0, -6.0, -3.0, 0.0, 3.0, 6.0, 10.0]
+    wit_grid = [-20.0, -10.0, -5.0, 0.0, 5.0, 10.0, 20.0]
+
+    base = estimate_sim_t24(
+        current_toc=current_toc,
+        p6=p6,
+        p12=p12,
+        p24=p24,
+        current_do=current_do,
+        current_ret=current_ret,
+        current_wit=current_wit,
+        do_delta=0.0,
+        ret_delta_pct=0.0,
+        wit_delta=0.0,
+        response_model=response_model,
+        delay_profile=delay_profile,
+        current_mlss=current_mlss,
+        mlss_q_low=mlss_q_low,
+        mlss_q_high=mlss_q_high,
+    )
+    base_t12 = float(base.get("sim_t12", float("nan")))
+
+    cand: list[dict] = []
+    for d_do in do_grid:
+        for d_ret in ret_grid:
+            for d_wit in wit_grid:
+                do_abs = float(current_do) + float(d_do) if np.isfinite(current_do) else (1.8 + float(d_do))
+                ret_abs = float(current_ret) + float(d_ret) if np.isfinite(current_ret) else (140.0 + float(d_ret))
+                wit_abs = float(current_wit) + float(d_wit) if np.isfinite(current_wit) else (6.0 + float(d_wit))
+                if not (0.8 <= do_abs <= 3.2):
+                    continue
+                if not (80.0 <= ret_abs <= 180.0):
+                    continue
+                if not (0.0 <= wit_abs <= 20.0):
+                    continue
+
+                est = estimate_sim_t24(
+                    current_toc=current_toc,
+                    p6=p6,
+                    p12=p12,
+                    p24=p24,
+                    current_do=current_do,
+                    current_ret=current_ret,
+                    current_wit=current_wit,
+                    do_delta=d_do,
+                    ret_delta_pct=d_ret,
+                    wit_delta=d_wit,
+                    response_model=response_model,
+                    delay_profile=delay_profile,
+                    current_mlss=current_mlss,
+                    mlss_q_low=mlss_q_low,
+                    mlss_q_high=mlss_q_high,
+                )
+                est["improve_vs_base"] = float(base_t12 - float(est.get("sim_t12", float("nan"))))
+                cand.append(est)
+
+    if not cand:
+        return {"ok": False, "reason": "no valid candidate"}
+
+    ranked = sorted(cand, key=lambda x: float(x.get("sim_t12", 1e9)))
+    best = ranked[0]
+    top3 = ranked[:3]
+    return {
+        "ok": True,
+        "base_t12": float(base_t12),
         "best": best,
         "top3": top3,
     }

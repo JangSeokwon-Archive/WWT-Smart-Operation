@@ -501,6 +501,29 @@ div[data-testid="stVerticalBlock"]:has(#trend_card_anchor) .js-plotly-plot .scat
     line-height: 1.35;
 }
 
+.diag-card {
+    border: 1px solid rgba(139, 92, 246, 0.24);
+    background: rgba(16, 14, 26, 0.82);
+    border-radius: 12px;
+    padding: .65rem .7rem;
+    margin-bottom: .6rem;
+}
+
+.diag-card-title {
+    color: #C4B5FD;
+    font-size: .78rem;
+    letter-spacing: .04em;
+    font-weight: 800;
+    margin-bottom: .42rem;
+}
+
+.diag-card-body {
+    color: #E8E8F3;
+    font-size: .86rem;
+    line-height: 1.45;
+    margin-bottom: .35rem;
+}
+
 .diag-action-wrap {
     display: grid;
     grid-template-columns: 1fr;
@@ -513,6 +536,20 @@ div[data-testid="stVerticalBlock"]:has(#trend_card_anchor) .js-plotly-plot .scat
     background: rgba(22, 18, 34, 0.82);
     border-radius: 10px;
     padding: .5rem .55rem;
+    display: grid;
+    gap: .12rem;
+}
+
+.diag-action-card b {
+    color: #F3F4F6;
+    font-size: .82rem;
+    font-weight: 800;
+}
+
+.diag-action-card span {
+    color: #C7C7D8;
+    font-size: .78rem;
+    line-height: 1.35;
 }
 
 .diag-action-head {
@@ -539,6 +576,44 @@ div[data-testid="stVerticalBlock"]:has(#trend_card_anchor) .js-plotly-plot .scat
     color: #C7C7D8;
     font-size: .79rem;
     line-height: 1.35;
+}
+
+.diag-sim-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: .45rem;
+}
+
+.diag-sim-card {
+    border: 1px solid rgba(139, 92, 246, 0.2);
+    background: rgba(22, 20, 34, 0.78);
+    border-radius: 10px;
+    padding: .5rem .55rem;
+    display: grid;
+    gap: .1rem;
+}
+
+.diag-sim-card b {
+    color: #F3F4F6;
+    font-size: .82rem;
+    margin-bottom: .1rem;
+}
+
+.diag-sim-card span {
+    color: #D7D7E4;
+    font-size: .78rem;
+    line-height: 1.35;
+}
+
+.diag-sim-best {
+    border: 1px solid rgba(16, 185, 129, 0.60);
+    background:
+        linear-gradient(180deg, rgba(16, 185, 129, 0.14), rgba(22, 20, 34, 0.85));
+    box-shadow: 0 0 0 1px rgba(16, 185, 129, 0.20) inset, 0 8px 24px rgba(16, 185, 129, 0.14);
+}
+
+.diag-sim-best b {
+    color: #34D399;
 }
 
 .diag-kpi-grid {
