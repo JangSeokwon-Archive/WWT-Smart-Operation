@@ -1,95 +1,90 @@
 # 대산 WWT 방류수 예측 대시보드
 
-폐수처리(WWT) 운전 데이터를 기반으로 `FINAL_TOC`를 예측하고, 운전자가 즉시 의사결정할 수 있도록 시각화/시뮬레이션/진단 기능을 제공하는 Streamlit 대시보드입니다.
+폐수처리(WWT) 운전 데이터를 기반으로 `FINAL_TOC`를 예측하고, 운전 의사결정(폭기조 DO/반송/인발)까지 연결하는 Streamlit 대시보드입니다.
 
-## 1) 포트폴리오 핵심 요약
-- 문제: 방류수 TOC 변동을 사전에 예측하고 운전 조치(폭기조 DO, 반송, 인발) 의사결정 지원
-- 접근: 시계열 파생 피처(`lag`, `rolling`, `diff`) + LightGBM 회귀 + Residual 보정
-- 산출물: Main 모니터링, Simulator(조치 시나리오), Notes, Settings, AI 운전 진단
-- 강점: 현업 용어 중심 UI(반송량/인발량/DO양), 12h 중심 운전 판단, 24h 리스크 분리
+## 1) 프로젝트 핵심
+- 문제: 방류수 TOC 변동을 선제적으로 예측하고, 운전 조치 우선순위를 제시
+- 접근: 시계열 피처 + LightGBM(Base) + Residual 보정
+- 결과: Main 모니터링 + Simulator + AI 진단 Drawer
 
-## 2) 모델 구조
-본 대시보드는 `wwt-toc-automl` 학습 산출물을 추론에 사용합니다.
+## 2) 분석/고도화 단계(포트폴리오 설명용)
+1. 데이터 정합화
+- 결측/시간축 보정, TOC 이상치 전처리, 타깃 지연 정렬(lead별)
 
-- 모델 유형: 회귀(트리 기반 부스팅, LightGBM)
-- 구조: Base + Residual
+2. Base 모델 구축
+- EQ/DAF 포함 전 공정 feature 기반으로 `pred_baseline` 학습
+- lead 6/12/24h 각각 학습/튜닝
+
+3. Residual 보정
+- `residual = y_true - pred_baseline`을 별도 학습
+- 폭기/침전 계열(AERA/AERB/CLAA/CLAB) lag/rolling/diff로 미세 오차 보정
+- 최종 예측: `pred_final = pred_baseline + pred_residual`
+
+4. 지연/비선형 분석
+- DO/반송/인발 영향 지연(6~24h) 리포트 생성
+- 운전 조작 대비 응답 구간 분석(control delay/sensitivity)
+
+5. 운전 시뮬레이터/진단 연동
+- 12h 최소 TOC 기준 Best 조합 제안
+- Main은 12h 중심, 24h는 리스크 전망으로 분리
+
+## 3) 모델 구조
+- 모델 타입: LightGBM 회귀
+- 파이프라인: Base + Residual
 - 예측 리드: 6h / 12h / 24h
-- 현재 운영 원칙:
-  - 메인/진단 기준: 12h 중심
-  - 24h: 리스크 전망(보조)
+- 운전 판단 기준: 12h 중심
 
-관련 리포트 예시(automl):
-- `delay_ccf_granger_*.json`
-- `nonlinear_zones_lead24h.json`
-- `regime_dynamic_lead24h.json`
-- `walkforward_stability.json`
+## 4) 포트폴리오 공개용 구성(모델 포함)
+다른 사람이 “같은 모델 결과”를 보려면 아래를 같이 배포해야 합니다.
 
-## 3) 주요 화면
-- Main (`streamlit_app.py`)
-  - 현재 TOC, 예측, 최근 신호, 트렌드
-  - 우측 진단 drawer
-- Simulator (`pages/1_Simulator.py`)
-  - 조작 변수 기반 12시간 시나리오
-- Notes (`pages/2_Notes.py`)
-  - 운전 기록/메모
-- Settings (`pages/3_Settings.py`)
-  - 목표치, 신호 임계비율, 진단 패널 설정
+필수:
+- `streamlit_app.py`
+- `assets/style.css`
+- `core/*.py`
+- `data/raw_sample.csv` (샘플 데이터)
+- `requirements.txt`
+- `README.md`
+- `../wwt-toc-automl/configs/base.yaml`
+- `../wwt-toc-automl/configs/features.yaml`
+- `../wwt-toc-automl/configs/features_residual.yaml`
+- `../wwt-toc-automl/outputs/models/toc_lgbm_lead6h_baseline.joblib`
+- `../wwt-toc-automl/outputs/models/toc_lgbm_lead6h_residual.joblib`
+- `../wwt-toc-automl/outputs/models/toc_lgbm_lead12h_baseline.joblib`
+- `../wwt-toc-automl/outputs/models/toc_lgbm_lead12h_residual.joblib`
+- `../wwt-toc-automl/outputs/models/toc_lgbm_lead24h_baseline.joblib`
+- `../wwt-toc-automl/outputs/models/toc_lgbm_lead24h_residual.joblib`
 
-## 4) 로컬 실행
-### 요구사항
-- Python 3.11+ 권장
-- pip
+권장(근거 리포트):
+- `../wwt-toc-automl/outputs/reports/holdout_residual_*.json`
+- `../wwt-toc-automl/outputs/reports/recommendation_backtest_*.json`
+- `../wwt-toc-automl/outputs/reports/control_delay_multivar_*.json`
 
-### 설치
+## 5) 샘플 데이터 처리
+원본 민감 데이터를 그대로 공개하지 말고 샘플로 변환해서 사용하세요.
+
 ```bash
 cd /Users/jangseog-won/wwt_predict/wwt_toc_dashboard
-pip install -r requirements.txt
+python scripts/make_portfolio_sample.py --input data/raw.csv --output data/raw_sample.csv --rows 1080
 ```
 
-### 실행
+처리 내용:
+- 최근 N행만 추출(기본 45일)
+- 날짜를 2031년 기준으로 시프트(실운전 시점 비식별)
+- 대시보드 핵심 컬럼 우선 정렬
+
+## 6) 실행
 ```bash
+cd /Users/jangseog-won/wwt_predict/wwt_toc_dashboard
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
 streamlit run streamlit_app.py
 ```
 
-접속: `http://localhost:8501`
+## 7) 배포
+- 내부망: `http://내IP:8501`
+- 외부 공유: 포트포워딩 또는 ngrok/cloudflared
 
-## 5) 배포(포트폴리오 공개)
-GitHub 업로드만으로는 외부 접속이 되지 않습니다. 반드시 배포 URL이 필요합니다.
-
-권장: Streamlit Community Cloud
-1. GitHub에 레포 푸시
-2. Streamlit Cloud에서 New app 생성
-3. Main file: `streamlit_app.py`
-4. Deploy
-
-배포 후 README 상단에 `Live Demo` 링크를 추가하세요.
-
-## 6) 포트폴리오에 같이 넣으면 좋은 내용
-- 데이터 개요: 기간, 샘플 수, 주요 센서/공정 변수
-- 검증 지표: RMSE, MAE, jump rate, overshoot rate
-- 의사결정 로직: 12h 기준 + 24h 리스크 보조
-- 한계: 장기 리드(24h+) 불안정 구간, 레짐 전이 구간 민감도
-- 개선 계획: 레짐 분기 강화, 워크포워드 재튜닝, 진단 근거 문구 자동화
-
-## 7) 디렉토리
-```text
-wwt_toc_dashboard/
-  streamlit_app.py
-  requirements.txt
-  assets/style.css
-  core/
-    automl_infer.py
-    llm_advisor.py
-    simulator.py
-    settings_store.py
-  pages/
-    1_Simulator.py
-    2_Notes.py
-    3_Settings.py
-  data/
-    raw.csv
-```
-
-## 8) 라이선스/주의
-- 내부 공정 데이터(원본 csv) 공개 시 민감정보 마스킹 필요
-- 포트폴리오 공개본에는 샘플 데이터 또는 익명화 데이터 사용 권장
+## 8) 주의
+- 공개본은 샘플/익명 데이터만 사용
+- `__pycache__`, `.DS_Store`, `.sqlite`, 대용량 zip은 커밋 제외 권장
