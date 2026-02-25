@@ -394,6 +394,16 @@ def _risk_level(v, warn, alarm) -> str:
     return "낮음"
 
 
+def _downsample_time_view(df: pd.DataFrame, max_points: int = 900) -> pd.DataFrame:
+    if df is None or len(df) <= int(max_points):
+        return df
+    step = max(1, int(math.ceil(len(df) / float(max_points))))
+    out = df.iloc[::step].copy()
+    if len(out) and out.index[-1] != df.index[-1]:
+        out = pd.concat([out, df.tail(1)], axis=0)
+    return out
+
+
 @st.cache_data(ttl=180)
 def load_df(path):
     try:
@@ -404,11 +414,11 @@ def load_df(path):
 
 @st.cache_data(ttl=600, show_spinner=False)
 def load_model_preds(raw_path: str, automl_root_path: str, raw_mtime: float):
-    # Fast path: reuse disk cache if the same raw file is already inferred.
+    # Fast path: reuse disk cache first (prefer speed for dashboard load).
     try:
         if pred_cache_path.exists():
             cached = json.loads(pred_cache_path.read_text(encoding="utf-8"))
-            if int(cached.get("version", -1)) == int(PRED_CACHE_VERSION) and float(cached.get("raw_mtime", -1.0)) == float(raw_mtime):
+            if int(cached.get("version", -1)) == int(PRED_CACHE_VERSION):
                 preds = cached.get("preds", {})
                 if isinstance(preds, dict):
                     return preds
@@ -562,6 +572,7 @@ with c_center:
                 st.session_state["date_range_selector_last"] = range_key
 
             view = slice_by_range(df, range_key)
+            plot_view = _downsample_time_view(view, max_points=900)
             # KPI는 범위 선택과 무관하게 "현재 최신값" 기준
             latest_toc = pick_latest(df, "FINAL_TOC")
             latest_flow = pick_latest(df, "FLOW")
@@ -756,10 +767,10 @@ with c_center:
 
             fig = go.Figure()
             x_pts = []
-            if "FINAL_TOC" in view.columns:
+            if "FINAL_TOC" in plot_view.columns:
                 fig.add_trace(go.Scatter(
-                    x=view.index,
-                    y=view["FINAL_TOC"],
+                    x=plot_view.index,
+                    y=plot_view["FINAL_TOC"],
                     mode="lines",
                     name="Actual",
                     line=dict(color="#8B5CF6", width=3, shape="spline"),
