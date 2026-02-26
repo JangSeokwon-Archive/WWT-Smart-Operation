@@ -104,8 +104,18 @@ automl_raw_path = APP_DIR.parent / "wwt-toc-automl" / "data" / "raw" / "raw.csv"
 if automl_raw_path.exists():
     raw_path = str(automl_raw_path)
 pred_cache_path = APP_DIR / ".cache" / "model_preds_main.json"
-delay_profile_path = APP_DIR.parent / "wwt-toc-automl" / "outputs" / "reports" / "control_delay_multivar_AERB_DO_AERB_WIT_AERB_RET_max72h.json"
-delay_search_summary_path = APP_DIR.parent / "wwt-toc-automl" / "outputs" / "reports" / "control_delay_multivar_search_summary.json"
+AUTOML_ROOT = APP_DIR.parent / "wwt-toc-automl"
+MODEL_BUNDLE = APP_DIR / "model_bundle"
+if AUTOML_ROOT.exists():
+    REPORT_ROOT = AUTOML_ROOT / "outputs" / "reports"
+else:
+    REPORT_ROOT = MODEL_BUNDLE / "reports"
+delay_search_summary_path = REPORT_ROOT / "control_delay_multivar_search_summary.json"
+delay_profile_path = REPORT_ROOT / "control_delay_multivar_AERB_DO_AERB_WIT_AERB_RET_max72h.json"
+if not delay_profile_path.exists():
+    alt_delay = REPORT_ROOT / "control_delay_multivar_AERB_DO_AERB_RET_AERB_WIT_max72h.json"
+    if alt_delay.exists():
+        delay_profile_path = alt_delay
 PRED_CACHE_VERSION = 5
 
 
@@ -424,6 +434,20 @@ def load_model_preds(raw_path: str, automl_root_path: str, raw_mtime: float):
                     return preds
     except Exception:
         pass
+    # If raw already contains predicted columns, use them directly (cloud-safe path).
+    try:
+        dfr = load_raw_csv(raw_path)
+        out = {}
+        for c in ("pred_t6", "pred_t12", "pred_t24"):
+            if c in dfr.columns:
+                v = pd.to_numeric(dfr[c], errors="coerce").dropna()
+                out[c] = float(v.iloc[-1]) if len(v) else float("nan")
+            else:
+                out[c] = float("nan")
+        if any(pd.notna(out.get(k, float("nan"))) for k in ("pred_t6", "pred_t12", "pred_t24")):
+            return out
+    except Exception:
+        pass
     try:
         preds = predict_multi_leads_from_automl(
             raw_path=raw_path,
@@ -529,7 +553,7 @@ if df is None:
     st.error(f"⚠️ Waiting for data... ({raw_path})")
     st.stop()
 raw_mtime = Path(raw_path).stat().st_mtime if Path(raw_path).exists() else 0.0
-model_preds = load_model_preds(raw_path, str(APP_DIR.parent / "wwt-toc-automl"), raw_mtime)
+model_preds = load_model_preds(raw_path, str(AUTOML_ROOT), raw_mtime)
 delay_summary = load_delay_profile_summary(str(delay_profile_path))
 
 st.markdown('<div style="height: 1rem;"></div>', unsafe_allow_html=True)
@@ -679,7 +703,7 @@ with c_center:
 
                 response_model_diag = load_response_model_for_diag(raw_path, raw_mtime)
                 delay_profile_diag = load_delay_profile_for_diag(str(delay_profile_path), str(delay_search_summary_path))
-                reco_strength = load_reco_strength_profile(str(APP_DIR.parent / "wwt-toc-automl" / "outputs" / "reports"), last_days=30)
+                reco_strength = load_reco_strength_profile(str(REPORT_ROOT), last_days=30)
                 sim_opt_24h = recommend_optimal_controls_24h(
                     current_toc=float(latest_toc) if pd.notna(latest_toc) else float("nan"),
                     p6=float(p6_ctx) if pd.notna(p6_ctx) else float("nan"),

@@ -30,6 +30,12 @@ raw_path = str(APP_DIR / "data" / "raw.csv")
 automl_raw_path = APP_DIR.parent / "wwt-toc-automl" / "data" / "raw" / "raw.csv"
 if automl_raw_path.exists():
     raw_path = str(automl_raw_path)
+AUTOML_ROOT = APP_DIR.parent / "wwt-toc-automl"
+MODEL_BUNDLE = APP_DIR / "model_bundle"
+if AUTOML_ROOT.exists():
+    REPORT_ROOT = AUTOML_ROOT / "outputs" / "reports"
+else:
+    REPORT_ROOT = MODEL_BUNDLE / "reports"
 WARN_TOC = 15.0
 ALARM_TOC = 20.0
 APP_SETTINGS = load_app_settings(APP_DIR)
@@ -67,6 +73,20 @@ def load_model_preds(raw_path: str, automl_root_path: str, raw_mtime: float):
                 preds = c.get("preds", {})
                 if isinstance(preds, dict):
                     return preds
+    except Exception:
+        pass
+    # Cloud-safe fallback: use existing pred columns in raw data if present.
+    try:
+        dfr = load_raw_csv(raw_path)
+        out = {}
+        for c in ("pred_t6", "pred_t12", "pred_t24"):
+            if c in dfr.columns:
+                v = pd.to_numeric(dfr[c], errors="coerce").dropna()
+                out[c] = float(v.iloc[-1]) if len(v) else float("nan")
+            else:
+                out[c] = float("nan")
+        if any(pd.notna(out.get(k, float("nan"))) for k in ("pred_t6", "pred_t12", "pred_t24")):
+            return out
     except Exception:
         pass
     try:
@@ -202,11 +222,15 @@ def _future_curve(
 
 df = load_df(raw_path)
 raw_mtime = Path(raw_path).stat().st_mtime if Path(raw_path).exists() else 0.0
-model_preds = load_model_preds(raw_path, str(APP_DIR.parent / "wwt-toc-automl"), raw_mtime)
+model_preds = load_model_preds(raw_path, str(AUTOML_ROOT), raw_mtime)
 response_model = load_response_model(raw_path, raw_mtime)
-reports_dir = APP_DIR.parent / "wwt-toc-automl" / "outputs" / "reports"
+reports_dir = REPORT_ROOT
 search_summary_path = reports_dir / "control_delay_multivar_search_summary.json"
 delay_profile_path = reports_dir / "control_delay_multivar_AERB_DO_AERB_WIT_AERB_RET_max72h.json"
+if not delay_profile_path.exists():
+    alt_delay = reports_dir / "control_delay_multivar_AERB_DO_AERB_RET_AERB_WIT_max72h.json"
+    if alt_delay.exists():
+        delay_profile_path = alt_delay
 if search_summary_path.exists():
     try:
         rows = json.loads(search_summary_path.read_text(encoding="utf-8"))
