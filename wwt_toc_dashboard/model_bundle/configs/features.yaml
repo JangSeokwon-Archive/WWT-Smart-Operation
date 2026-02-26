@@ -1,0 +1,59 @@
+equipment_prefixes:
+  - "AERA"
+  - "AERB"
+  - "CLAA"
+  - "CLAB"
+  - "EQ"
+  - "DAF"
+
+global_cols:
+  - "FLOW"
+  - "TEMP"
+
+global_feature_params:
+  lags: [12, 24, 48]
+  rolls: [24, 48, 72]
+  diffs: [1, 3, 6]
+
+per_equipment:
+  AERA:
+    lags: [1, 2, 3, 6, 12, 24, 48, 72, 96, 120]
+    rolls: [3, 12, 24, 48, 72]
+    diffs: [1, 3, 6, 12, 24, 48]
+
+  AERB:
+    lags: [2, 3, 6, 12, 24, 48, 72, 96, 120]
+    rolls: [24, 48, 72]
+    diffs: [1, 3, 6, 12, 24, 48]
+
+  CLAA:
+    lags: [1, 2, 3, 12, 24, 48, 72, 96, 120]
+    rolls: [3, 6, 12, 24, 48, 72]
+    diffs: [1, 3, 6, 12, 24]
+
+  CLAB:
+    lags: [1, 2, 3, 6, 12, 24]
+    rolls: [3, 6, 12, 24, 48, 72]
+    diffs: [1, 3, 6, 12, 24]
+
+  EQ:
+    lags: [1, 6, 12, 24, 48, 96, 120]
+    rolls: [3, 6, 12, 24, 48, 72]
+    diffs: [1, 3, 6, 12]
+
+  DAF:
+    lags: [6, 12, 24, 72, 96, 120]
+    rolls: [24, 48, 72]
+    diffs: [1, 3, 6, 12]
+
+cross_features:
+  aer_ab_mean_diff: true
+  cla_ab_mean_diff: true
+  trend_features:
+    enabled: true
+    cols: ["FINAL_TOC_raw", "EQ_TOC", "DAF_TOC", "AER_TOC__mean"]
+    lags: [1, 3, 6, 12, 24, 48]
+    rolls: [6, 12, 24, 48]
+
+leakage_guard:
+  exclude_prefixes: ["FINAL"]

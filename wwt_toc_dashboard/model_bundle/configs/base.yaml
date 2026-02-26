@@ -1,0 +1,45 @@
+time_col: "날짜"
+target_col: "FINAL_TOC"
+
+# 데이터는 1시간 단위
+sampling_minutes: 60
+
+# TOC 분석 지연(있으면 반영) - 60이면 1 step shift
+toc_delay_minutes: 60
+
+cv:
+  n_splits: 4
+
+metric:
+  primary: "mae"
+  rmse_weight: 0.5
+
+paths:
+  raw_csv: "data/raw/raw.csv"
+  report_dir: "outputs/reports"
+  model_dir: "outputs/models"
+
+k_drop: 8.0
+maint_min_run: 7
+keep_long_drop: true
+
+precision:
+  enabled: true
+  require_cols:
+    - "AERA_SRT"
+    - "AERB_SRT"
+    - "AERA_SVI"
+    - "AERB_SVI"
+    - "AERA_FM"
+    - "AERB_FM"
+    - "AERA_SV"
+    - "AERB_SV"
+    - "AERA_RET_CON"
+    - "AERB_RET_CON"
+
+
+lead_hours: 12   # 6/12/24 중 원하는 값
+
+# residual model quick-check defaults
+residual_n_estimators: 800
+residual_n_jobs: 1

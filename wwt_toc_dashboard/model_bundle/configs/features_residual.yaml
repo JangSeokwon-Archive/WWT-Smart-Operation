@@ -1,0 +1,49 @@
+# =========================
+# Residual (미생물 보정) 전용 Feature
+# =========================
+
+equipment_prefixes:
+  - "AERA"
+  - "AERB"
+  - "CLAA"
+  - "CLAB"
+
+global_cols: []   # residual에는 FLOW/TEMP 안 씀
+
+global_feature_params:
+  lags: []
+  rolls: []
+  diffs: []
+
+per_equipment:
+  # 폭기조 – 느린 상태 변수만
+  AERA:
+    lags:  [12, 24, 48, 72]
+    rolls: [24, 48]
+    diffs: [24]
+  AERB:
+    lags:  [12, 24, 48, 72]
+    rolls: [24, 48]
+    diffs: [24]
+
+  # 침전조 – 보조적
+  CLAA:
+    lags:  [12, 24, 48]
+    rolls: [24]
+    diffs: []
+  CLAB:
+    lags:  [12, 24, 48]
+    rolls: [24]
+    diffs: []
+
+cross_features:
+  aer_ab_mean_diff: true
+  cla_ab_mean_diff: false
+  trend_features:
+    enabled: false
+
+leakage_guard:
+  exclude_prefixes:
+    - "FINAL"
+    - "EQ"
+    - "DAF"

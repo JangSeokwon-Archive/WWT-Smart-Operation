@@ -1,90 +1,111 @@
-# 대산 WWT 방류수 예측 대시보드
+# 대산 WWT 방류수 TOC 예측 및 운전 의사결정 대시보드
 
-폐수처리(WWT) 운전 데이터를 기반으로 `FINAL_TOC`를 예측하고, 운전 의사결정(폭기조 DO/반송/인발)까지 연결하는 Streamlit 대시보드입니다.
+## 1. 프로젝트 개요
+본 프로젝트는 폐수처리 공정의 방류수 품질지표(`FINAL_TOC`)를 시간선행(6h, 12h, 24h) 관점에서 예측하고,
+운전 변수(폭기조 DO, 반송량, 인발량) 조정 시나리오를 통해 운영 의사결정을 지원하기 위해 구축되었다.
 
-## 1) 프로젝트 핵심
-- 문제: 방류수 TOC 변동을 선제적으로 예측하고, 운전 조치 우선순위를 제시
-- 접근: 시계열 피처 + LightGBM(Base) + Residual 보정
-- 결과: Main 모니터링 + Simulator + AI 진단 Drawer
+핵심 목표는 다음과 같다.
+- 단순 모니터링을 넘어, **선행 예측 기반 운전 판단** 제공
+- 예측 결과를 **운전 조치 시뮬레이션**과 연결
+- 현장 용어 중심의 **설명 가능한 진단 UI** 구현
 
-## 2) 분석/고도화 단계(포트폴리오 설명용)
-1. 데이터 정합화
-- 결측/시간축 보정, TOC 이상치 전처리, 타깃 지연 정렬(lead별)
+---
 
-2. Base 모델 구축
-- EQ/DAF 포함 전 공정 feature 기반으로 `pred_baseline` 학습
-- lead 6/12/24h 각각 학습/튜닝
+## 2. 데이터 및 문제 정의
+- 예측 대상: `FINAL_TOC`
+- 주요 입력군:
+  - 공정/유입: `FLOW`, `TEMP`
+  - 폭기조: `AERB_DO`, `AERB_RET`, `AERB_WIT`, `AERB_MLSS` 및 관련 계열
+  - 전단/중간 공정: EQ/DAF/침전조 계열 시계열
+- 예측 리드: 6시간, 12시간, 24시간
 
-3. Residual 보정
-- `residual = y_true - pred_baseline`을 별도 학습
-- 폭기/침전 계열(AERA/AERB/CLAA/CLAB) lag/rolling/diff로 미세 오차 보정
+문제 특성상 결측/이상치, 공정 지연(Delay), 레짐 전환(저부하/고부하) 영향이 크므로,
+단일 모델 성능보다 **운전 관점의 안정성**과 **리드 간 일관성**을 함께 관리하도록 설계하였다.
+
+---
+
+## 3. 모델 아키텍처
+
+### 3.1 Base 모델
+- 알고리즘: LightGBM Regressor
+- 입력: 장비 prefix 기반 시계열 파생 피처 (`lag`, `rolling`, `diff`)
+- 산출: `pred_baseline`
+
+### 3.2 Residual 보정 모델
+- 타깃 정의: `residual = y_true - pred_baseline`
+- 알고리즘: LightGBM Regressor
+- 역할: Base가 설명하지 못한 잔차를 추가 학습하여 최종 오차 축소
 - 최종 예측: `pred_final = pred_baseline + pred_residual`
 
-4. 지연/비선형 분석
-- DO/반송/인발 영향 지연(6~24h) 리포트 생성
-- 운전 조작 대비 응답 구간 분석(control delay/sensitivity)
+### 3.3 운전 시뮬레이터
+- 조정 변수: DO / 반송량 / 인발량
+- 지연 프로파일 및 공정 제약(과폭기/과도조작 페널티)을 반영
+- 12h 기준 최소 TOC 조합(`Best`) 제안
 
-5. 운전 시뮬레이터/진단 연동
-- 12h 최소 TOC 기준 Best 조합 제안
-- Main은 12h 중심, 24h는 리스크 전망으로 분리
+---
 
-## 3) 모델 구조
-- 모델 타입: LightGBM 회귀
-- 파이프라인: Base + Residual
-- 예측 리드: 6h / 12h / 24h
-- 운전 판단 기준: 12h 중심
+## 4. 고도화 과정
+본 프로젝트는 단일 학습-배포가 아니라, 다음 단계를 반복하며 고도화되었다.
 
-## 4) 포트폴리오 공개용 구성(모델 포함)
-다른 사람이 “같은 모델 결과”를 보려면 아래를 같이 배포해야 합니다.
+1. 데이터 정합화
+- 시간축 정렬, 결측 보간, TOC 급락/이상치 처리, 타깃 지연 정렬
 
-필수:
-- `streamlit_app.py`
-- `assets/style.css`
-- `core/*.py`
-- `data/raw_sample.csv` (샘플 데이터)
-- `requirements.txt`
-- `README.md`
-- `../wwt-toc-automl/configs/base.yaml`
-- `../wwt-toc-automl/configs/features.yaml`
-- `../wwt-toc-automl/configs/features_residual.yaml`
-- `../wwt-toc-automl/outputs/models/toc_lgbm_lead6h_baseline.joblib`
-- `../wwt-toc-automl/outputs/models/toc_lgbm_lead6h_residual.joblib`
-- `../wwt-toc-automl/outputs/models/toc_lgbm_lead12h_baseline.joblib`
-- `../wwt-toc-automl/outputs/models/toc_lgbm_lead12h_residual.joblib`
-- `../wwt-toc-automl/outputs/models/toc_lgbm_lead24h_baseline.joblib`
-- `../wwt-toc-automl/outputs/models/toc_lgbm_lead24h_residual.joblib`
+2. 피처 엔지니어링 확장
+- 장비별 lag/rolling/diff 후보 확장
+- 누수 방지(leakage guard) 규칙 적용(`FINAL*` 등 제외)
 
-권장(근거 리포트):
-- `../wwt-toc-automl/outputs/reports/holdout_residual_*.json`
-- `../wwt-toc-automl/outputs/reports/recommendation_backtest_*.json`
-- `../wwt-toc-automl/outputs/reports/control_delay_multivar_*.json`
+3. Base 모델 튜닝
+- Optuna 기반 하이퍼파라미터 탐색
+- 리드(6/12/24h)별 독립 최적화
 
-## 5) 샘플 데이터 처리
-원본 민감 데이터를 그대로 공개하지 말고 샘플로 변환해서 사용하세요.
+4. Residual 도입
+- Base 예측 잔차를 별도 학습하여 MAE/RMSE 개선
+- 폭기/침전 영역 중심 피처로 미세 오차 보정
 
-```bash
-cd /Users/jangseog-won/wwt_predict/wwt_toc_dashboard
-python scripts/make_portfolio_sample.py --input data/raw.csv --output data/raw_sample.csv --rows 1080
-```
+5. 운전 친화형 분석 결합
+- 제어 변수 영향 지연(Delay) 분석
+- 12h 중심 운영 판단 + 24h 리스크 보조 체계 분리
 
-처리 내용:
-- 최근 N행만 추출(기본 45일)
-- 날짜를 2031년 기준으로 시프트(실운전 시점 비식별)
-- 대시보드 핵심 컬럼 우선 정렬
+6. 대시보드/진단 UX 개선
+- 상태 요약/예측/부하/권장 조치/시뮬레이터 추천 카드 구조
+- 운전 용어(반송량/인발량/DO양) 중심 설명
 
-## 6) 실행
-```bash
-cd /Users/jangseog-won/wwt_predict/wwt_toc_dashboard
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-streamlit run streamlit_app.py
-```
+---
 
-## 7) 배포
-- 내부망: `http://내IP:8501`
-- 외부 공유: 포트포워딩 또는 ngrok/cloudflared
+## 5. 대시보드 구성
+- **Main**: 현재 TOC, 12h 예측, 추세, 최근 신호
+- **Simulator**: 조작 변수 변경 시 예측 곡선 및 TOC 변화 확인
+- **AI 진단 Drawer**:
+  1) 상태 요약
+  2) 12h/24h 예측 및 리스크
+  3) 부하(F/M) 진단
+  4) 권장 운전 조치
+  5) 시뮬레이터 Best 조합
 
-## 8) 주의
-- 공개본은 샘플/익명 데이터만 사용
-- `__pycache__`, `.DS_Store`, `.sqlite`, 대용량 zip은 커밋 제외 권장
+---
+
+## 6. 포트폴리오 공개 기준
+실데이터 민감성을 고려하여 공개본은 샘플 데이터 기반으로 구성한다.
+
+- 샘플 생성 스크립트: `scripts/make_portfolio_sample.py`
+- 샘플 파일: `data/raw_sample.csv`
+- 재현성 확보를 위해 모델/설정 번들 동봉
+  - `model_bundle/configs/*.yaml`
+  - `model_bundle/models/*.joblib`
+  - `model_bundle/reports/*.json`
+
+---
+
+## 7. 기술 스택
+- Python, Pandas, NumPy
+- LightGBM, Optuna
+- Streamlit, Plotly
+
+---
+
+## 8. 한계 및 향후 개선
+- 24h 리드 안정성은 레짐 전환 구간에서 변동성이 큼
+- 향후 계획:
+  - 레짐 분기형 모델(정상/고부하/쇼크) 고도화
+  - 워크포워드 기반 안정성 지표(점프율/오버슈트율) 정례 평가
+  - 운전 권고 로직의 실운전 피드백 반영

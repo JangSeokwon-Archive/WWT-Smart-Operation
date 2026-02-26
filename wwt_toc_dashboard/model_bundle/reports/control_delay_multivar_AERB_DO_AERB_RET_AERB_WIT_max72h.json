@@ -1,0 +1,53 @@
+{
+  "time_col": "날짜",
+  "target_col": "FINAL_TOC",
+  "mlss_col": "AERB_MLSS",
+  "controls": [
+    "AERB_DO",
+    "AERB_RET",
+    "AERB_WIT"
+  ],
+  "max_lag_h": 72,
+  "diff_h": 1,
+  "ridge": 10.0,
+  "train_ratio": 0.8,
+  "n_rows_used": 35695,
+  "n_features": 438,
+  "rmse_train_dy": 0.19610103088896436,
+  "rmse_valid_dy": 0.33607103426550866,
+  "summary": {
+    "AERB_DO": {
+      "peak_lag_main_h": 50,
+      "peak_coef_main": -0.04413464333786494,
+      "cum_coef_0_6h": -0.02990638911021136,
+      "cum_coef_7_24h": -0.36754094342280136,
+      "cum_coef_25_72h": -0.7476833919569484,
+      "peak_lag_low_mlss_h": 50,
+      "peak_eff_low_mlss": -0.060803934823615055,
+      "peak_lag_high_mlss_h": 14,
+      "peak_eff_high_mlss": -0.08072720739654413
+    },
+    "AERB_RET": {
+      "peak_lag_main_h": 24,
+      "peak_coef_main": 0.005851729144576034,
+      "cum_coef_0_6h": -0.0041680285871421785,
+      "cum_coef_7_24h": 0.005314699314820796,
+      "cum_coef_25_72h": -0.0022897113958120496,
+      "peak_lag_low_mlss_h": 2,
+      "peak_eff_low_mlss": 0.002974529326487139,
+      "peak_lag_high_mlss_h": 24,
+      "peak_eff_high_mlss": 0.013641900027586156
+    },
+    "AERB_WIT": {
+      "peak_lag_main_h": 32,
+      "peak_coef_main": -0.014958545579163493,
+      "cum_coef_0_6h": -0.028355162321892974,
+      "cum_coef_7_24h": -0.06626474300578235,
+      "cum_coef_25_72h": 0.14267197765320191,
+      "peak_lag_low_mlss_h": 58,
+      "peak_eff_low_mlss": 0.016034190821713194,
+      "peak_lag_high_mlss_h": 31,
+      "peak_eff_high_mlss": -0.04093562054986703
+    }
+  }
+}

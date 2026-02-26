@@ -1,0 +1,39 @@
+# OS / editor
+.DS_Store
+.vscode/
+.idea/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+
+# Env
+.venv/
+.venv*/
+
+# Runtime/local DB/cache
+*.sqlite
+.cache/
+
+# Archives
+*.zip
+*.tar
+*.gz
+
+# Ignore unrelated local workspaces at repo root
+/260118_legacy/
+/app/
+/artifacts_capacity/
+/data/
+/quant_basic_study/
+/reports/
+/src/
+/wwt-aer-model/
+/wwt_aer/
+/wwt_aer_v1/
+
+# Dashboard local runtime notes DB
+wwt_toc_dashboard/data_notes/*.sqlite

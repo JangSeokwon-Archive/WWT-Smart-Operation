@@ -1,0 +1,27 @@
+{
+  "lead_hours": 24,
+  "last_days": 30,
+  "cutoff": "2025-12-24 18:00:00",
+  "n_valid": 121,
+  "controls": [
+    "AERA_DO",
+    "AERB_DO",
+    "AERA_WIT",
+    "AERB_WIT",
+    "AERA_RET",
+    "AERB_RET"
+  ],
+  "step_ratio": 0.1,
+  "sample_every": 6,
+  "bounds_quantiles": [
+    0.05,
+    0.95
+  ],
+  "mean_delta_pred": -0.0017213983095536712,
+  "p05_delta_pred": -0.006013708684882602,
+  "pred_improvement_rate": 0.19008264462809918,
+  "mae_baseline": 0.7098864286235826,
+  "mae_recommended": 0.7088290521011469,
+  "mae_delta": -0.0010573765224358262,
+  "abs_error_improvement_rate": 0.09917355371900827
+}
