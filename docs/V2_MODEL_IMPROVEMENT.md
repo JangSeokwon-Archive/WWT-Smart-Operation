@@ -25,10 +25,9 @@ The input is rehashed before completion. Do not publish private output files.
 
 ## Prior Evidence And Hypotheses
 
-The prior V2 test favored persistence for every horizon; fitted models exhibited
-negative bias and much worse than nominal prediction-interval coverage. No
-threshold-exceedance events were present in that test. These observations do
-not establish why the models failed or whether persistence will always win.
+The investigation examines stability, prediction bias, coverage, event counts
+and the conditions in which persistence is a strong benchmark. Process-derived
+findings and quantitative results are retained only in the private report.
 
 The private V2.1 report distinguishes measured evidence and uncertain mechanisms:
 
