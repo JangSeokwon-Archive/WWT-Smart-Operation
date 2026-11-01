@@ -64,14 +64,17 @@ def event_metrics(origins: pd.DatetimeIndex, y, predictions, horizon: int, alarm
     actual = pd.Series(np.asarray(y, float), index=origins + pd.Timedelta(hours=horizon))
     pred = pd.Series(np.asarray(predictions, float), index=actual.index)
     over = actual.ge(alarm)
-    # A missing hourly observation breaks an event; it cannot establish onset.
+    # A gap cannot establish a new event onset; that transition is censored.
     continuous = actual.index.to_series().diff().eq(pd.Timedelta(hours=1))
-    starts = over & (~over.shift(1, fill_value=False) | ~continuous)
+    starts = over & ~over.shift(1, fill_value=False) & continuous
     leads = []
     count = 0
     for start in actual.index[starts]:
         if start - actual.index[0] < pd.Timedelta(hours=horizon):
             continue  # Left-censored onset: insufficient pre-event forecast window.
+        previous = pd.date_range(start - pd.Timedelta(hours=horizon), start - pd.Timedelta(hours=1), freq="h")
+        if not previous.isin(actual.index).all():
+            continue  # A gap in the pre-event window makes warning time unknown.
         count += 1
         end = start
         while end + pd.Timedelta(hours=1) in actual.index and bool(over.loc[end + pd.Timedelta(hours=1)]):
