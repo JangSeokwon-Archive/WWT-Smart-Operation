@@ -1,0 +1,18 @@
+{
+  "version": "shadow-config-v1",
+  "internal_toc_alarm": 20.0,
+  "alarm_is_legal_limit": false,
+  "toc_rise_delta": null,
+  "inflow_toc_rise_delta": null,
+  "load_change_delta": null,
+  "high_load_threshold": null,
+  "mlss_change_delta": null,
+  "missing_fraction_threshold": null,
+  "outside_reference_fraction_threshold": null,
+  "event_window_hours": 24,
+  "min_scored_per_horizon": 30,
+  "target_delay_hours_assumption": 1,
+  "drift_thresholds": {},
+  "performance_thresholds": {},
+  "threshold_note": "Unset thresholds are unvalidated; configure from development data and operational review."
+}

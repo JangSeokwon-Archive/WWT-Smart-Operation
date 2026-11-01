@@ -5,10 +5,32 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /.github/
+            /tests/
+            /wwt_toc_dashboard/core/
+            /wwt_toc_dashboard/pages/
+            /wwt_toc_dashboard/scripts/
+            /wwt_toc_dashboard/assets/
+            /wwt_toc_dashboard/src/
+            /wwt_toc_dashboard/model_bundle/configs/
+            /wwt_toc_dashboard/.streamlit/
+            /wwt_toc_dashboard/streamlit_app.py
+            /wwt_toc_dashboard/requirements.txt
+            /pytest.ini
+            /requirements-v2.txt
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
           cache: pip
           cache-dependency-path: requirements-v2.txt
       - run: pip install -r requirements-v2.txt
+      - name: Assert private and bundled data are absent
+        run: |
+          test ! -e wwt_toc_dashboard/data/raw.csv
+          test ! -e wwt_toc_dashboard/data/raw_sample.csv
+          test ! -e wwt_toc_dashboard/model_bundle/models
+          test ! -e .local
       - run: python -m pytest -q
