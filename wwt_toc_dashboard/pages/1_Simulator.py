@@ -1,4 +1,5 @@
 import json
+import os
 from pathlib import Path
 import numpy as np
 import pandas as pd
@@ -14,9 +15,12 @@ from core.simulator import (
     delay_profile_effect_curve,
     do_optimal_target_by_mlss,
     do_overaeration_penalty,
+    scenario_in_support,
 )
 from core.signals import classify_signal, badge_pill_html
 from core.automl_infer import predict_multi_leads_from_automl
+from core.prediction_cache import cached_predictions, prediction_fingerprint, file_digest
+from core.forecast_status import show_forecast_status
 from core.settings_store import load_app_settings
 
 st.set_page_config(page_title="Simulator", layout="wide", initial_sidebar_state="collapsed")
@@ -30,6 +34,7 @@ raw_path = str(APP_DIR / "data" / "raw.csv")
 automl_raw_path = APP_DIR.parent / "wwt-toc-automl" / "data" / "raw" / "raw.csv"
 if automl_raw_path.exists():
     raw_path = str(automl_raw_path)
+raw_path = os.getenv("WWT_RAW_PATH", raw_path)
 AUTOML_ROOT = APP_DIR.parent / "wwt-toc-automl"
 MODEL_BUNDLE = APP_DIR / "model_bundle"
 if AUTOML_ROOT.exists():
@@ -42,7 +47,7 @@ APP_SETTINGS = load_app_settings(APP_DIR)
 sim_default_target = float(APP_SETTINGS.get("sim_default_target_toc", 20.0))
 target_limit = float(st.session_state.get("sim_target_limit", sim_default_target))
 SIM_PRED_CACHE_VERSION = 4
-SIM_RESP_CACHE_VERSION = 2
+SIM_RESP_CACHE_VERSION = 3
 
 
 def calc_efficiency(inflow: float, outflow: float) -> float:
@@ -57,55 +62,18 @@ def calc_efficiency(inflow: float, outflow: float) -> float:
 
 
 @st.cache_data
-def load_df(path: str):
+def load_df(path: str, input_digest: str):
     df0 = load_raw_csv(path)
     df0 = ensure_pred_columns(df0)
     return df0
 
 
-@st.cache_data(ttl=60)
-def load_model_preds(raw_path: str, automl_root_path: str, raw_mtime: float):
+def load_model_preds(raw_path: str, automl_root_path: str, fingerprint: str):
     cache_path = APP_DIR / ".cache" / "sim_model_preds.json"
     try:
-        if cache_path.exists():
-            c = json.loads(cache_path.read_text(encoding="utf-8"))
-            if int(c.get("version", -1)) == int(SIM_PRED_CACHE_VERSION) and float(c.get("raw_mtime", -1.0)) == float(raw_mtime):
-                preds = c.get("preds", {})
-                if isinstance(preds, dict):
-                    return preds
-    except Exception:
-        pass
-    # Cloud-safe fallback: use existing pred columns in raw data if present.
-    try:
-        dfr = load_raw_csv(raw_path)
-        out = {}
-        for c in ("pred_t6", "pred_t12", "pred_t24"):
-            if c in dfr.columns:
-                v = pd.to_numeric(dfr[c], errors="coerce").dropna()
-                out[c] = float(v.iloc[-1]) if len(v) else float("nan")
-            else:
-                out[c] = float("nan")
-        if any(pd.notna(out.get(k, float("nan"))) for k in ("pred_t6", "pred_t12", "pred_t24")):
-            return out
-    except Exception:
-        pass
-    try:
-        preds = predict_multi_leads_from_automl(
-            raw_path=raw_path,
-            automl_root_path=automl_root_path,
-            leads=(6, 12, 24),
-        )
-        try:
-            cache_path.parent.mkdir(parents=True, exist_ok=True)
-            cache_path.write_text(
-                json.dumps({"version": int(SIM_PRED_CACHE_VERSION), "raw_mtime": float(raw_mtime), "preds": preds}, ensure_ascii=False),
-                encoding="utf-8",
-            )
-        except Exception:
-            pass
-        return preds
-    except Exception:
-        return {"pred_t6": float("nan"), "pred_t12": float("nan"), "pred_t24": float("nan")}
+        return cached_predictions(raw_path, automl_root_path, cache_path, fingerprint)
+    except Exception as error:
+        return {"pred_t6": float("nan"), "pred_t12": float("nan"), "pred_t24": float("nan"), "_meta": {"error": str(error)}}
 
 @st.cache_data(ttl=600)
 def load_response_model(raw_path: str, raw_mtime: float):
@@ -162,18 +130,13 @@ def _future_curve(
     response_model: dict | None,
     delay_profile: dict | None,
     horizon_hours: int = 24,
+    horizon_offsets: tuple[int, int, int] = (6, 12, 24),
 ):
     """Build baseline/simulated future curves from +1h..+24h with smooth bending."""
-    if not np.isfinite(last_actual):
+    if not all(np.isfinite(v) for v in (last_actual, p6, p12, p24)):
         return None, None
-    if not np.isfinite(p6):
-        p6 = last_actual
-    if not np.isfinite(p12):
-        p12 = p6
-    if not np.isfinite(p24):
-        p24 = p12
 
-    x_anchor = np.array([0.0, 6.0, 12.0, 24.0], dtype=float)
+    x_anchor = np.array([0.0, *horizon_offsets], dtype=float)
     y_anchor = np.array([last_actual, p6, p12, p24], dtype=float)
 
     x = np.arange(0.0, float(horizon_hours) + 1.0, 1.0)
@@ -182,6 +145,13 @@ def _future_curve(
         slope24 = (p24 - p12) / 12.0
         tail_mask = x > 24.0
         base[tail_mask] = p24 + (x[tail_mask] - 24.0) * slope24
+
+    if do_delta == 0 and ret_delta == 0 and wit_delta == 0:
+        return base, base.copy()
+    if not all(np.isfinite(v) for v in (cur_do, cur_ret, cur_wit)):
+        return base, None
+    if not scenario_in_support(response_model or {}, cur_do + do_delta, cur_ret + ret_delta, cur_wit + wit_delta):
+        return base, None
 
     do_now = float(cur_do) if np.isfinite(cur_do) else 1.8
     ret_now = float(cur_ret) if np.isfinite(cur_ret) else 140.0
@@ -220,9 +190,11 @@ def _future_curve(
 
     return base, sim
 
-df = load_df(raw_path)
+df = load_df(raw_path, file_digest(raw_path))
 raw_mtime = Path(raw_path).stat().st_mtime if Path(raw_path).exists() else 0.0
-model_preds = load_model_preds(raw_path, str(AUTOML_ROOT), raw_mtime)
+model_preds = load_model_preds(raw_path, str(AUTOML_ROOT), prediction_fingerprint(raw_path, str(AUTOML_ROOT)))
+show_forecast_status(model_preds)
+st.caption("시뮬레이션 추정값: 관찰 이력의 상관관계와 가정에 기반하며 실제 제어 효과는 미검증입니다. 설비별 운전 한계와 계측값을 확인하세요.")
 response_model = load_response_model(raw_path, raw_mtime)
 reports_dir = REPORT_ROOT
 search_summary_path = reports_dir / "control_delay_multivar_search_summary.json"
@@ -322,11 +294,11 @@ with a:
             mlss_q_high=mlss_q_high,
         )
 
-        last_actual = float(view["FINAL_TOC"].dropna().iloc[-1]) if "FINAL_TOC" in view.columns and len(view["FINAL_TOC"].dropna()) else float("nan")
+        last_actual = model_preds.get("current_toc_ref", float("nan"))
         last_idx = view.index.max() if len(view.index) else None
-        p6 = float(view["pred_t6"].dropna().iloc[-1]) if "pred_t6" in view.columns and len(view["pred_t6"].dropna()) else float("nan")
-        p12 = float(view["pred_t12"].dropna().iloc[-1]) if "pred_t12" in view.columns and len(view["pred_t12"].dropna()) else float("nan")
-        p24 = float(view["pred_t24"].dropna().iloc[-1]) if "pred_t24" in view.columns and len(view["pred_t24"].dropna()) else float("nan")
+        p6 = float("nan")
+        p12 = float("nan")
+        p24 = float("nan")
         if pd.notna(model_preds.get("pred_t6", float("nan"))):
             p6 = float(model_preds["pred_t6"])
         if pd.notna(model_preds.get("pred_t12", float("nan"))):
@@ -351,10 +323,15 @@ with a:
             response_model=response_model,
             delay_profile=delay_profile,
             horizon_hours=horizon_h,
+            horizon_offsets=tuple(model_preds.get("_meta", {}).get("horizons", {}).get(str(h), {}).get("effective_horizon_hours", h) for h in (6, 12, 24)),
         )
 
-        base_latest = float(fc_base[-1]) if fc_base is not None else float(base.dropna().iloc[-1]) if len(base.dropna()) else float("nan")
-        sim_latest = float(fc_sim[-1]) if fc_sim is not None else float(sim.dropna().iloc[-1]) if len(sim.dropna()) else float("nan")
+        base_latest = float(fc_base[-1]) if fc_base is not None else float("nan")
+        sim_latest = float(fc_sim[-1]) if fc_sim is not None else float("nan")
+        if fc_base is None:
+            st.warning("최신 예측이 없어 미래 시뮬레이션을 표시하지 않습니다.")
+        elif fc_sim is None:
+            st.warning("조작값이 관측 범위를 벗어나거나 현재 운전값이 부족합니다. 효과 추정을 보류합니다.")
         sim_delta = sim_latest - base_latest
         ret_now = float(view["AERB_RET"].dropna().iloc[-1]) if "AERB_RET" in view.columns and len(view["AERB_RET"].dropna()) else float("nan")
         ret_sim = ret_now + ret_delta_pct if pd.notna(ret_now) else float("nan")

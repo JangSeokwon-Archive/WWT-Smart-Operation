@@ -37,3 +37,7 @@ __pycache__/
 
 # Dashboard local runtime notes DB
 wwt_toc_dashboard/data_notes/*.sqlite
+
+# V2 experiments contain private aggregates, predictions and fitted models.
+.local/
+*.log
