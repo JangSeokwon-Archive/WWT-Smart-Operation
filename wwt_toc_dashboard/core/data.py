@@ -14,6 +14,10 @@ def load_raw_csv(path: str) -> pd.DataFrame:
     if df is None:
         raise last_err if last_err else ValueError(f"CSV read failed: {path}")
 
+    df.columns = df.columns.astype(str).str.replace("\ufeff", "", regex=False).str.strip()
+    if df.columns.duplicated().any():
+        raise ValueError("Duplicate CSV column names after normalization")
+
     if "날짜" not in df.columns:
         raise ValueError("raw.csv에 '날짜' 컬럼이 없습니다.")
     df = df.dropna(subset=["날짜"]).copy()
@@ -26,12 +30,13 @@ def load_raw_csv(path: str) -> pd.DataFrame:
         ts3 = pd.to_datetime(df["날짜"], errors="coerce")
         ts = ts3.where(ts.isna(), ts)
     df["날짜"] = ts
-    df = df.dropna(subset=["날짜"]).sort_values("날짜")
+    df = df.dropna(subset=["날짜"]).sort_values("날짜", kind="stable")
+    df = df.drop_duplicates("날짜", keep="last")
     df = df.set_index("날짜")
 
     for c in df.columns:
         df[c] = pd.to_numeric(df[c], errors="coerce")
-    return df
+    return df.replace([np.inf, -np.inf], np.nan)
 
 def pick_latest(df: pd.DataFrame, col: str) -> float:
     if col not in df.columns:

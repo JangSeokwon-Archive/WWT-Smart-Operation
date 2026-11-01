@@ -15,7 +15,9 @@ import pandas as pd
 from core.data import load_raw_csv, pick_latest, slice_by_range, ensure_pred_columns
 from core.signals import classify_signal, badge_pill_html, signal_label_ko
 from core.automl_infer import predict_multi_leads_from_automl
-from core.llm_advisor import run_llm_advisor, build_quick_report
+from core.prediction_cache import cached_predictions, prediction_fingerprint, file_digest
+from core.forecast_status import show_forecast_status
+from core.llm_advisor import run_llm_advisor, build_quick_report, rule_status
 from core.simulator import (
     fit_quadratic_response_model,
     recommend_optimal_controls_24h,
@@ -103,6 +105,7 @@ raw_path = str(APP_DIR / "data" / "raw.csv")
 automl_raw_path = APP_DIR.parent / "wwt-toc-automl" / "data" / "raw" / "raw.csv"
 if automl_raw_path.exists():
     raw_path = str(automl_raw_path)
+raw_path = os.getenv("WWT_RAW_PATH", raw_path)
 pred_cache_path = APP_DIR / ".cache" / "model_preds_main.json"
 AUTOML_ROOT = APP_DIR.parent / "wwt-toc-automl"
 MODEL_BUNDLE = APP_DIR / "model_bundle"
@@ -358,20 +361,7 @@ def _build_local_watchpoints(ctx: dict) -> list[str]:
 
 
 def _status_from_ctx(ctx: dict) -> str:
-    th = ctx.get("thresholds", {}) if isinstance(ctx, dict) else {}
-    warn = float(th.get("warn", WARN_TOC)) if isinstance(th, dict) else WARN_TOC
-    alarm = float(th.get("alarm", ALARM_TOC)) if isinstance(th, dict) else ALARM_TOC
-    p12 = ctx.get("pred_t12")
-    p24 = ctx.get("pred_t24")
-    cur = ctx.get("current_toc")
-    ref = p12 if isinstance(p12, (int, float)) else (p24 if isinstance(p24, (int, float)) else cur)
-    if not isinstance(ref, (int, float)):
-        return "주의"
-    if float(ref) >= float(alarm):
-        return "주의"
-    if float(ref) >= float(warn):
-        return "경고"
-    return "양호"
+    return rule_status(ctx)
 
 
 def _trend_label_from_slope(v) -> str:
@@ -395,8 +385,8 @@ def _fm_level(fm) -> str:
 
 
 def _risk_level(v, warn, alarm) -> str:
-    if not isinstance(v, (int, float)):
-        return "중간"
+    if not isinstance(v, (int, float)) or not math.isfinite(v):
+        return "정보 부족"
     if v >= alarm:
         return "높음"
     if v >= warn:
@@ -415,56 +405,18 @@ def _downsample_time_view(df: pd.DataFrame, max_points: int = 900) -> pd.DataFra
 
 
 @st.cache_data(ttl=180)
-def load_df(path):
+def load_df(path, input_digest):
     try:
         df = load_raw_csv(path)
         return ensure_pred_columns(df) if df is not None else None
     except Exception:
         return None
 
-@st.cache_data(ttl=600, show_spinner=False)
-def load_model_preds(raw_path: str, automl_root_path: str, raw_mtime: float):
-    # Fast path: reuse disk cache first (prefer speed for dashboard load).
+def load_model_preds(raw_path: str, automl_root_path: str, fingerprint: str):
     try:
-        if pred_cache_path.exists():
-            cached = json.loads(pred_cache_path.read_text(encoding="utf-8"))
-            if int(cached.get("version", -1)) == int(PRED_CACHE_VERSION):
-                preds = cached.get("preds", {})
-                if isinstance(preds, dict):
-                    return preds
-    except Exception:
-        pass
-    # If raw already contains predicted columns, use them directly (cloud-safe path).
-    try:
-        dfr = load_raw_csv(raw_path)
-        out = {}
-        for c in ("pred_t6", "pred_t12", "pred_t24"):
-            if c in dfr.columns:
-                v = pd.to_numeric(dfr[c], errors="coerce").dropna()
-                out[c] = float(v.iloc[-1]) if len(v) else float("nan")
-            else:
-                out[c] = float("nan")
-        if any(pd.notna(out.get(k, float("nan"))) for k in ("pred_t6", "pred_t12", "pred_t24")):
-            return out
-    except Exception:
-        pass
-    try:
-        preds = predict_multi_leads_from_automl(
-            raw_path=raw_path,
-            automl_root_path=automl_root_path,
-            leads=(6, 12, 24),
-        )
-        try:
-            pred_cache_path.parent.mkdir(parents=True, exist_ok=True)
-            pred_cache_path.write_text(
-                json.dumps({"version": int(PRED_CACHE_VERSION), "raw_mtime": float(raw_mtime), "generated_at": int(time.time()), "preds": preds}, ensure_ascii=False),
-                encoding="utf-8",
-            )
-        except Exception:
-            pass
-        return preds
-    except Exception:
-        return {"pred_t6": float("nan"), "pred_t12": float("nan"), "pred_t24": float("nan")}
+        return cached_predictions(raw_path, automl_root_path, pred_cache_path, fingerprint)
+    except Exception as error:
+        return {"pred_t6": float("nan"), "pred_t12": float("nan"), "pred_t24": float("nan"), "_meta": {"error": str(error)}}
 
 
 @st.cache_data(ttl=600, show_spinner=False)
@@ -548,12 +500,13 @@ def load_reco_strength_profile(report_dir: str, last_days: int = 30):
             continue
     return out
 
-df = load_df(raw_path)
+df = load_df(raw_path, file_digest(raw_path) if Path(raw_path).exists() else "missing")
 if df is None:
     st.error(f"⚠️ Waiting for data... ({raw_path})")
     st.stop()
 raw_mtime = Path(raw_path).stat().st_mtime if Path(raw_path).exists() else 0.0
-model_preds = load_model_preds(raw_path, str(AUTOML_ROOT), raw_mtime)
+model_preds = load_model_preds(raw_path, str(AUTOML_ROOT), prediction_fingerprint(raw_path, str(AUTOML_ROOT)))
+show_forecast_status(model_preds)
 delay_summary = load_delay_profile_summary(str(delay_profile_path))
 
 st.markdown('<div style="height: 1rem;"></div>', unsafe_allow_html=True)
@@ -598,30 +551,13 @@ with c_center:
             view = slice_by_range(df, range_key)
             plot_view = _downsample_time_view(view, max_points=900)
             # KPI는 범위 선택과 무관하게 "현재 최신값" 기준
-            latest_toc = pick_latest(df, "FINAL_TOC")
+            latest_toc = model_preds.get("current_toc_ref", float("nan"))
             latest_flow = pick_latest(df, "FLOW")
             latest_temp = pick_latest(df, "TEMP")
             last_updated = df.index.max()
-            pred_val = pick_latest(df, "pred_t12")
-            pred_label = "12시간 뒤 예측"
-            if pd.notna(model_preds.get("pred_t12", float("nan"))):
-                pred_val = float(model_preds["pred_t12"])
-            if not pd.notna(pred_val):
-                pred_val = pick_latest(df, "pred_t24")
-                pred_label = "24시간 뒤 예측"
-            if pd.notna(model_preds.get("pred_t24", float("nan"))) and pred_label == "24시간 뒤 예측":
-                pred_val = float(model_preds["pred_t24"])
-            if not pd.notna(pred_val):
-                pred_val = pick_latest(df, "pred_t36")
-                pred_label = "36시간 뒤 예측"
-            if pd.notna(model_preds.get("pred_t36", float("nan"))) and pred_label == "36시간 뒤 예측":
-                pred_val = float(model_preds["pred_t36"])
-            if not pd.notna(pred_val):
-                pred_val = pick_latest(df, "pred_final")
-                pred_label = "최신 예측"
-            if not pd.notna(pred_val):
-                pred_val = latest_toc
-                pred_label = "최신값 대체"
+            pred_val = model_preds.get("pred_t12", float("nan"))
+            effective12 = model_preds.get("_meta", {}).get("horizons", {}).get("12", {}).get("effective_horizon_hours", 12)
+            pred_label = f"{effective12}시간 뒤 예측" if pd.notna(pred_val) else "예측 불가"
 
             aerb_do = pick_latest(df, "AERB_DO")
             aerb_wit = pick_latest(df, "AERB_WIT")
@@ -651,9 +587,9 @@ with c_center:
                 mlss_band = "UNKNOWN"
 
             if run_diag:
-                p6_ctx = pick_latest(df, "pred_t6")
-                p12_ctx = pick_latest(df, "pred_t12")
-                p24_ctx = pick_latest(df, "pred_t24")
+                p6_ctx = float("nan")
+                p12_ctx = float("nan")
+                p24_ctx = float("nan")
                 if pd.notna(model_preds.get("pred_t6", float("nan"))):
                     p6_ctx = float(model_preds["pred_t6"])
                 if pd.notna(model_preds.get("pred_t12", float("nan"))):
@@ -734,6 +670,7 @@ with c_center:
                 )
 
                 ctx = {
+                    "forecast_meta": model_preds.get("_meta", {}),
                     "timestamp": str(last_updated) if pd.notna(last_updated) else "",
                     "current_toc": float(latest_toc) if pd.notna(latest_toc) else None,
                     "pred_t6": float(p6_ctx) if pd.notna(p6_ctx) else None,
@@ -806,10 +743,10 @@ with c_center:
             # 최신 기준 예측 점선(+24h 범위)
             if len(df) and pd.notna(df.index.max()):
                 last_idx = df.index.max()
-                last_actual = pick_latest(df, "FINAL_TOC")
-                p6 = pick_latest(df, "pred_t6")
-                p12 = pick_latest(df, "pred_t12")
-                p24 = pick_latest(df, "pred_t24")
+                last_actual = model_preds.get("current_toc_ref", float("nan"))
+                p6 = float("nan")
+                p12 = float("nan")
+                p24 = float("nan")
                 if pd.notna(model_preds.get("pred_t6", float("nan"))):
                     p6 = float(model_preds["pred_t6"])
                 if pd.notna(model_preds.get("pred_t12", float("nan"))):
@@ -817,35 +754,32 @@ with c_center:
                 if pd.notna(model_preds.get("pred_t24", float("nan"))):
                     p24 = float(model_preds["pred_t24"])
                 candidates = [
-                    (last_idx + pd.Timedelta(hours=6), p6),
-                    (last_idx + pd.Timedelta(hours=12), p12),
-                    (last_idx + pd.Timedelta(hours=24), p24),
+                    (last_idx + pd.Timedelta(hours=model_preds.get("_meta", {}).get("horizons", {}).get(str(h), {}).get("effective_horizon_hours", h)), value)
+                    for h, value in ((6, p6), (12, p12), (24, p24))
                 ]
                 valid = [(x, y) for x, y in candidates if pd.notna(y)]
                 x_pts = [x for x, _ in valid]
                 y_pts = [y for _, y in valid]
-                if len(y_pts) == 0 and pd.notna(last_actual):
-                    x_pts = [last_idx + pd.Timedelta(hours=12), last_idx + pd.Timedelta(hours=24)]
-                    y_pts = [last_actual, last_actual]
 
                 if pd.notna(last_actual) and len(y_pts):
                     # Forecast window is always +24h (model support horizon).
-                    display_end = last_idx + pd.Timedelta(hours=24)
+                    offsets = {h: model_preds.get("_meta", {}).get("horizons", {}).get(str(h), {}).get("effective_horizon_hours", h) for h in (6, 12, 24)}
+                    display_end = last_idx + pd.Timedelta(hours=max(offsets.values()))
                     if len(y_pts):
                         a_x = np.array([0.0], dtype=float)
                         a_y = np.array([float(last_actual)], dtype=float)
                         if pd.notna(p6):
-                            a_x = np.append(a_x, 6.0)
+                            a_x = np.append(a_x, float(offsets[6]))
                             a_y = np.append(a_y, float(p6))
                         if pd.notna(p12):
-                            a_x = np.append(a_x, 12.0)
+                            a_x = np.append(a_x, float(offsets[12]))
                             a_y = np.append(a_y, float(p12))
                         if pd.notna(p24):
-                            a_x = np.append(a_x, 24.0)
+                            a_x = np.append(a_x, float(offsets[24]))
                             a_y = np.append(a_y, float(p24))
                         order = np.argsort(a_x)
                         a_x, a_y = a_x[order], a_y[order]
-                        h = np.arange(0.0, 25.0, 1.0)
+                        h = np.arange(0.0, float(max(offsets.values())) + 1.0, 1.0)
                         y_h = np.interp(h, a_x, a_y)
                         x_plot = [last_idx + pd.Timedelta(hours=int(v)) for v in h]
                         y_plot = list(y_h)
@@ -983,7 +917,7 @@ with c_center:
         color = "#10B981" if status == "양호" else ("#F59E0B" if status == "경고" else "#EF4444")
         diagnosis = "" if status == "양호" else "운전 안정성 점검이 필요합니다."
         source = escape(str(diag_state.get("source", "rule_local"))) if isinstance(diag_state, dict) else "rule_local"
-        source = f"{source} · ui-v3"
+        source = f"{source} · ui-v4"
         flow_now = cctx.get("FLOW")
         do_now = cctx.get("AERB_DO")
         do_rec = cctx.get("mlss_recommended_do")
@@ -1029,12 +963,11 @@ with c_center:
         else:
             interp24 = "안정유지"
 
-        b12 = max(0.15, 0.30 * abs(float(p12_v) - float(cur_v))) if isinstance(p12_v, (int, float)) and isinstance(cur_v, (int, float)) else 0.20
-        b24 = max(0.20, 0.35 * abs(float(p24_v) - float(p12_v))) if isinstance(p24_v, (int, float)) and isinstance(p12_v, (int, float)) else 0.30
-        p12_lo = float(p12_v) - b12 if isinstance(p12_v, (int, float)) else float("nan")
-        p12_hi = float(p12_v) + b12 if isinstance(p12_v, (int, float)) else float("nan")
-        p24_lo = float(p24_v) - b24 if isinstance(p24_v, (int, float)) else float("nan")
-        p24_hi = float(p24_v) + b24 if isinstance(p24_v, (int, float)) else float("nan")
+        horizon_meta = cctx.get("forecast_meta", {}).get("horizons", {})
+        p12_lo, p12_hi = horizon_meta.get("12", {}).get("interval", [float("nan"), float("nan")])
+        p24_lo, p24_hi = horizon_meta.get("24", {}).get("interval", [float("nan"), float("nan")])
+        actual_h12 = horizon_meta.get("12", {}).get("effective_horizon_hours", 12)
+        actual_h24 = horizon_meta.get("24", {}).get("effective_horizon_hours", 24)
         risk24 = _risk_level(p24_v, warn_v, alarm_v)
 
         if fm_level == "저부하":
@@ -1057,7 +990,7 @@ with c_center:
 
         # Safe scenario is intentionally omitted by request; keep only "Best (TOC 최소)".
 
-        need_action = bool(best) and (
+        need_action = bool(best) and bool((sim_opt or {}).get("causal_validated")) and (
             abs(float(best.get("do_delta", 0.0))) > 1e-6
             or abs(float(best.get("ret_delta_pct", 0.0))) > 1e-6
             or abs(float(best.get("wit_delta", 0.0))) > 1e-6
@@ -1078,14 +1011,19 @@ with c_center:
         else:
             actions_html = (
                 "<div class='diag-action-card'>"
-                "<b>현재 즉각적인 조정은 필요하지 않습니다.</b>"
-                "<span>모니터링 중심 운전을 권장합니다.</span>"
+                "<b>실제 제어 효과와 설비별 운전 한계가 미검증입니다.</b>"
+                "<span>추천 조작값은 보류합니다. 시뮬레이션 추정값과 계측 상태를 운전자가 검토해야 합니다.</span>"
                 "</div>"
             )
 
         flow_text = _fmt(flow_now, 0, " t/h")
         do_text = f"{_fmt(do_now,2,' ppm')} / 권장 {_fmt(do_rec,2,' ppm')}"
         status_line = f"현재 최종 TOC {_fmt(cur_v,2)} mg/L, 유입 {flow_text} 조건에서 공정은 {proc_state} 상태입니다."
+        explanation = ""
+        if isinstance(diag_state, dict):
+            explanation = str((diag_state.get("payload") or {}).get("report", ""))
+        if not explanation:
+            explanation = build_quick_report(cctx).payload["report"]
         source_clean = _force_plain_or_fallback(source, "rule_local · ui-v3")
 
         drawer_html = dedent(
@@ -1101,6 +1039,7 @@ with c_center:
                     <div class="diag-card-title">1) AI 종합 진단</div>
                     <div class="diag-drawer-status" style="color:{color};">{status}</div>
                     <div class="diag-card-body">{escape(status_line)}</div>
+                    <div class="diag-card-body">{escape(explanation)}</div>
                     <ul class="diag-drawer-list">
                         <li>폭기조 DO {_fmt(do_now,2)} (목표 {_fmt(do_rec,2)}, 편차 {_fmt(do_gap,2)})</li>
                         <li>F/M {_fmt(fm_now,3)} → {fm_level}</li>
@@ -1111,12 +1050,12 @@ with c_center:
                 <div class="diag-card">
                     <div class="diag-card-title">2) 운전 예측 및 리스크 전망</div>
                     <div class="diag-card-body">
-                        <b>12시간 예측</b><br/>
-                        12시간 후 예상 TOC: {_fmt(p12_v,2)} mg/L ({trend12})<br/>
-                        변동 범위: {_fmt(p12_lo,2)} ~ {_fmt(p12_hi,2)}<br/><br/>
-                        <b>24시간 리스크</b><br/>
-                        24시간 후 예상 TOC: {_fmt(p24_v,2)} mg/L<br/>
-                        리스크 범위: {_fmt(p24_lo,2)} ~ {_fmt(p24_hi,2)}<br/>
+                        <b>{actual_h12}시간 예측</b><br/>
+                        {actual_h12}시간 후 예상 TOC: {_fmt(p12_v,2)} mg/L ({trend12})<br/>
+                        보정 구간(없으면 미검증): {_fmt(p12_lo,2)} ~ {_fmt(p12_hi,2)}<br/><br/>
+                        <b>{actual_h24}시간 리스크</b><br/>
+                        {actual_h24}시간 후 예상 TOC: {_fmt(p24_v,2)} mg/L<br/>
+                        보정 구간(없으면 미검증): {_fmt(p24_lo,2)} ~ {_fmt(p24_hi,2)}<br/>
                         리스크 수준: {risk24}<br/><br/>
                         현재 조건 유지 시 {interp24}이 예상됩니다.
                     </div>
@@ -1138,7 +1077,7 @@ with c_center:
                 </div>
 
                 <div class="diag-card">
-                    <div class="diag-card-title">5) 시뮬레이터 추천 운전 조합</div>
+                    <div class="diag-card-title">5) 시뮬레이션 추정 조합 · 실제 효과 미검증</div>
                     <div class="diag-sim-grid">
                         <div class="diag-sim-card diag-sim-best">
                             <b>Best (TOC 최소)</b>

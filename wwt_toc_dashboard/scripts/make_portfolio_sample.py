@@ -16,9 +16,9 @@ def _load_csv_auto(path: Path) -> pd.DataFrame:
 
 
 def main() -> None:
-    ap = argparse.ArgumentParser(description="Create anonymized portfolio sample data from raw.csv")
+    ap = argparse.ArgumentParser(description="Create a PRIVATE date-shifted sample; process values are NOT anonymized")
     ap.add_argument("--input", type=str, default="data/raw.csv")
-    ap.add_argument("--output", type=str, default="data/raw_sample.csv")
+    ap.add_argument("--output", type=str, default=".local/raw_sample.csv")
     ap.add_argument("--rows", type=int, default=24 * 45, help="keep last N rows (default: 45 days hourly)")
     ap.add_argument("--time-col", type=str, default="날짜")
     args = ap.parse_args()
@@ -32,7 +32,7 @@ def main() -> None:
         if not ts.notna().any():
             ts = pd.to_datetime(df[args.time_col], errors="coerce")
         if ts.notna().any():
-            # Shift timeline so portfolio data does not expose real operation dates.
+            # Date shifting alone does not anonymize process measurements.
             shift = pd.Timestamp("2031-01-01 00:00:00") - ts.dropna().iloc[0]
             df[args.time_col] = (ts + shift).dt.strftime("%Y-%m-%d %H:%M:%S")
 
@@ -58,6 +58,7 @@ def main() -> None:
     p_out.parent.mkdir(parents=True, exist_ok=True)
     df.to_csv(p_out, index=False, encoding="utf-8-sig")
     print(f"saved: {p_out} rows={len(df)} cols={len(df.columns)}")
+    print("PRIVATE SAMPLE: date-shifted only; obtain data-owner approval before publishing.")
 
 
 if __name__ == "__main__":

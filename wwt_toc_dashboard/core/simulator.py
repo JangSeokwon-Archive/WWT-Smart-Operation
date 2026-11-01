@@ -35,16 +35,23 @@ def fit_quadratic_response_model(
     if miss:
         return {"ok": False, "reason": f"missing columns: {miss}"}
 
-    sub = df[cols].dropna().copy()
+    sub = df[cols].replace([np.inf, -np.inf], np.nan).dropna().sort_index().copy()
     if len(sub) < 300:
         return {"ok": False, "reason": "too few rows"}
 
-    # Robust clipping to reduce extreme raw spikes impact.
-    for c in [target_col, do_col, ret_col, wit_col]:
-        lo, hi = sub[c].quantile(0.005), sub[c].quantile(0.995)
-        sub = sub[(sub[c] >= lo) & (sub[c] <= hi)]
-    if len(sub) < 300:
-        return {"ok": False, "reason": "too few rows after clipping"}
+    # Split first: holdout values must not determine filtering thresholds.
+    cut = max(200, int(len(sub) * 0.8))
+    train, valid = sub.iloc[:cut].copy(), sub.iloc[cut:].copy()
+    bounds = {}
+    keep = pd.Series(True, index=train.index)
+    for c in [do_col, ret_col, wit_col]:
+        lo, hi = train[c].quantile(0.005), train[c].quantile(0.995)
+        bounds[c] = [float(lo), float(hi)]
+        keep &= train[c].between(lo, hi)
+    train = train.loc[keep]
+    if len(train) < 200 or len(valid) < 30:
+        return {"ok": False, "reason": "too few rows for chronological validation"}
+    sub = pd.concat([train, valid])
 
     y = sub[target_col].to_numpy(dtype=float)
     do_v = sub[do_col].to_numpy(dtype=float)
@@ -53,7 +60,7 @@ def fit_quadratic_response_model(
     f = _poly_features(do_v, ret_v, wit_v)
 
     n = len(f)
-    cut = max(200, int(n * 0.8))
+    cut = len(train)
     f_tr, f_va = f[:cut], f[cut:]
     y_tr, y_va = y[:cut], y[cut:]
 
@@ -90,12 +97,18 @@ def fit_quadratic_response_model(
         "do_col": do_col,
         "ret_col": ret_col,
         "wit_col": wit_col,
+        "support_bounds": bounds,
+        "validation": "chronological observational holdout; causal effect unverified",
+        "causal_validated": False,
+        "label": "simulation estimate",
     }
 
 def predict_response(model: dict, do_v: float, ret_v: float, wit_v: float) -> float:
     if not model or not model.get("ok"):
         return float("nan")
     if not (np.isfinite(do_v) and np.isfinite(ret_v) and np.isfinite(wit_v)):
+        return float("nan")
+    if not scenario_in_support(model, do_v, ret_v, wit_v):
         return float("nan")
     beta = np.asarray(model["beta"], dtype=float)
     mu = np.asarray(model["mu"], dtype=float)
@@ -107,6 +120,16 @@ def predict_response(model: dict, do_v: float, ret_v: float, wit_v: float) -> fl
     )[0]
     x = np.concatenate(([1.0], (f - mu) / sigma))
     return float(x @ beta)
+
+
+def scenario_in_support(model: dict, do_v: float, ret_v: float, wit_v: float) -> bool:
+    bounds = model.get("support_bounds", {})
+    for column, value in zip((model.get("do_col"), model.get("ret_col"), model.get("wit_col")), (do_v, ret_v, wit_v)):
+        if not np.isfinite(value) or value < 0:
+            return False
+        if column in bounds and not bounds[column][0] <= value <= bounds[column][1]:
+            return False
+    return True
 
 def operational_safety_penalty(do_v: float, ret_v: float, wit_v: float) -> float:
     # Process guard: over-aeration / oxygen shortage / too-high return can hurt treatment stability.
@@ -223,6 +246,12 @@ def apply_simulation(base_pred: pd.Series, do_delta: float, ret_delta_pct: float
     n = len(base_pred)
     if n == 0:
         return base_pred
+    if do_delta == 0 and ret_delta_pct == 0 and wit_delta == 0:
+        return base_pred.copy()
+    if not all(np.isfinite(v) for v in (current_do, current_ret, current_wit)):
+        return base_pred * np.nan
+    if not scenario_in_support(response_model or {}, current_do + do_delta, current_ret + ret_delta_pct, current_wit + wit_delta):
+        return base_pred * np.nan
 
     do_now = float(current_do) if np.isfinite(current_do) else 1.8
     ret_now = float(current_ret) if np.isfinite(current_ret) else 140.0
@@ -346,6 +375,10 @@ def recommend_optimal_controls_24h(
     mlss_q_low: float = float("nan"),
     mlss_q_high: float = float("nan"),
 ) -> dict:
+    if not all(np.isfinite(v) for v in (current_toc, p6, p12, p24, current_do, current_ret, current_wit)):
+        return {"ok": False, "reason": "current observations/forecasts unavailable"}
+    if not response_model or not response_model.get("ok"):
+        return {"ok": False, "reason": "response model unavailable"}
     do_grid = [-0.6, -0.4, -0.2, 0.0, 0.2, 0.4, 0.6]
     ret_grid = [-10.0, -6.0, -3.0, 0.0, 3.0, 6.0, 10.0]
     wit_grid = [-20.0, -10.0, -5.0, 0.0, 5.0, 10.0, 20.0]
@@ -382,6 +415,8 @@ def recommend_optimal_controls_24h(
                     continue
                 if not (0.0 <= wit_abs <= 20.0):
                     continue
+                if not scenario_in_support(response_model, do_abs, ret_abs, wit_abs):
+                    continue
 
                 est = estimate_sim_t24(
                     current_toc=current_toc,
@@ -414,6 +449,8 @@ def recommend_optimal_controls_24h(
         "base_t24": float(base_t24),
         "best": best,
         "top3": top3,
+        "causal_validated": False,
+        "label": "simulation estimate; equipment limits not validated",
     }
 
 
@@ -431,6 +468,10 @@ def recommend_optimal_controls_12h(
     mlss_q_low: float = float("nan"),
     mlss_q_high: float = float("nan"),
 ) -> dict:
+    if not all(np.isfinite(v) for v in (current_toc, p6, p12, p24, current_do, current_ret, current_wit)):
+        return {"ok": False, "reason": "current observations/forecasts unavailable"}
+    if not response_model or not response_model.get("ok"):
+        return {"ok": False, "reason": "response model unavailable"}
     do_grid = [-0.6, -0.4, -0.2, 0.0, 0.2, 0.4, 0.6]
     ret_grid = [-10.0, -6.0, -3.0, 0.0, 3.0, 6.0, 10.0]
     wit_grid = [-20.0, -10.0, -5.0, 0.0, 5.0, 10.0, 20.0]
@@ -467,6 +508,8 @@ def recommend_optimal_controls_12h(
                     continue
                 if not (0.0 <= wit_abs <= 20.0):
                     continue
+                if not scenario_in_support(response_model, do_abs, ret_abs, wit_abs):
+                    continue
 
                 est = estimate_sim_t24(
                     current_toc=current_toc,
@@ -499,4 +542,6 @@ def recommend_optimal_controls_12h(
         "base_t12": float(base_t12),
         "best": best,
         "top3": top3,
+        "causal_validated": False,
+        "label": "simulation estimate; equipment limits not validated",
     }
