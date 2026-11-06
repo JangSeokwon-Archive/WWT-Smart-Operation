@@ -21,7 +21,7 @@ HORIZONS = (6, 12, 24)
 
 def utc(value) -> datetime:
     value = pd.Timestamp(value)
-    if value.tzinfo is None:
+    if pd.isna(value) or value.tzinfo is None:
         raise ValueError("Timestamp must include an explicit timezone")
     return value.tz_convert("UTC").to_pydatetime()
 
@@ -157,7 +157,7 @@ class ShadowStore:
             raise ValueError("Observation is not yet available at ingestion time")
         if sample.minute or sample.second or sample.microsecond:
             raise ValueError("Observation sample must be hourly")
-        if not source_id or not column or not math.isfinite(float(value)):
+        if not isinstance(source_id, str) or not source_id.strip() or not isinstance(column, str) or not column.strip() or not math.isfinite(float(value)):
             raise ValueError("A source id, column and finite value are required")
         if column == "FINAL_TOC" and available < sample + timedelta(hours=self.target_delay_hours):
             raise ValueError("TOC observation precedes the configured reporting delay")

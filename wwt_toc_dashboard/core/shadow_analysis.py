@@ -13,7 +13,7 @@ def bootstrap_sensitivity(y, reference, candidate, index, *, blocks=(24, 48, 72,
     delta, idx = delta[finite], idx[finite]
     if idx.has_duplicates or not idx.is_monotonic_increasing:
         raise ValueError("Bootstrap requires unique, time-ordered forecasts")
-    breaks = np.r_[0, np.flatnonzero(np.diff(idx.asi8) != pd.Timedelta(hours=1).value) + 1, len(idx)]
+    breaks = np.r_[0, np.flatnonzero((idx[1:] - idx[:-1]) != pd.Timedelta(hours=1)) + 1, len(idx)]
     segments = [np.arange(a, b) for a, b in zip(breaks[:-1], breaks[1:])]
     result = {}
     for hours in blocks:
